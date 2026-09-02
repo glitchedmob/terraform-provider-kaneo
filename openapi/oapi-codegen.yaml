@@ -1,0 +1,10 @@
+package: client
+generate:
+  models: true
+  client: true
+output: internal/client/client.gen.go
+output-options:
+  nullable-type: true
+  overlay:
+    path: openapi/kaneo.overlay.yaml
+    strict: true
