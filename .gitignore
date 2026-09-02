@@ -1,0 +1,19 @@
+# Binaries
+terraform-provider-kaneo
+terraform-provider-kaneo_*
+
+# Terraform working directories and state
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Go
+coverage.out
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
