@@ -618,8 +618,8 @@ type Column struct {
 	Name    string `json:"name"`
 
 	// Position Board order, ascending. Columns are always returned sorted by it.
-	Position  float32 `json:"position"`
-	ProjectId string  `json:"projectId"`
+	Position  int32  `json:"position"`
+	ProjectId string `json:"projectId"`
 
 	// Slug Stable identifier derived from the name; tasks store this as their status.
 	Slug      string    `json:"slug"`
@@ -1930,8 +1930,8 @@ type UpdateOrganizationTeamJSONBody struct {
 type ReorderColumnsJSONBody struct {
 	// Columns Every column keeps its new position. Columns from another project are rejected.
 	Columns []struct {
-		Id       string  `json:"id"`
-		Position float32 `json:"position"`
+		Id       string `json:"id"`
+		Position int32  `json:"position"`
 	} `json:"columns"`
 }
 
