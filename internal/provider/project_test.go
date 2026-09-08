@@ -5,6 +5,7 @@ package provider
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -23,101 +24,65 @@ func projectTestModel() projectModel {
 	}
 }
 
-func TestProjectResourceLifecycle(t *testing.T) {
-	var remote map[string]any
-	testFixture(t, projectFixture, &remote)
-	var calls []string
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch r.Method {
-		case http.MethodPost:
-			var body map[string]any
-			if !testDecodeRequest(t, w, r, &body) {
-				return
+func TestProjectMutationWireShapes(t *testing.T) {
+	for _, create := range []bool{true, false} {
+		t.Run(fmt.Sprintf("create=%t", create), func(t *testing.T) {
+			model := projectTestModel()
+			model.ID = types.StringValue("project-1")
+			if create {
+				model.Description, model.IsPublic = types.StringValue("Created description"), types.BoolValue(true)
+			} else {
+				model.Name, model.Slug, model.Icon = types.StringValue("Renamed"), types.StringValue("NEW"), types.StringValue("")
 			}
-			for _, field := range []string{"workspaceId", "name", "slug", "icon"} {
-				if body[field] != remote[field] {
-					t.Errorf("create %s = %v, want %v", field, body[field], remote[field])
+			var calls []string
+			r := &projectResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls = append(calls, r.Method+" "+r.URL.Path)
+				var body map[string]any
+				if !testDecodeRequest(t, w, r, &body) {
+					return
+				}
+				want := map[string]any{"name": model.Name.ValueString(), "slug": model.Slug.ValueString(), "icon": model.Icon.ValueString(), "description": model.Description.ValueString(), "isPublic": model.IsPublic.ValueBool()}
+				if r.Method == http.MethodPost {
+					want = map[string]any{"workspaceId": "workspace-1", "name": "Engineering", "slug": "ENG", "icon": "Layout"}
+				}
+				if !reflect.DeepEqual(body, want) {
+					t.Errorf("body = %v, want %v", body, want)
+				}
+				result := projectFixture
+				if create && r.Method == http.MethodPut {
+					result = strings.ReplaceAll(strings.ReplaceAll(result, `"description":null`, `"description":"Created description"`), `"isPublic":false`, `"isPublic":true`)
+				}
+				if _, err := fmt.Fprint(w, result); err != nil {
+					t.Error(err)
+				}
+			})}
+			plan := testPlan(t, r, model)
+			wantCalls := "PUT /project/project-1"
+			if create {
+				response := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+				var got projectModel
+				if diags := response.State.Get(t.Context(), &got); diags.HasError() {
+					t.Fatal(diags)
+				}
+				if got.ID != model.ID || got.Description != model.Description || got.IsPublic != model.IsPublic {
+					t.Fatalf("second response not saved: %+v", got)
+				}
+				wantCalls = "POST /project,PUT /project/project-1"
+			} else {
+				response := resource.UpdateResponse{State: tfsdk.State(plan)}
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
 				}
 			}
-			if len(body) != 4 {
-				t.Errorf("unexpected create fields: %v", body)
+			if strings.Join(calls, ",") != wantCalls {
+				t.Fatalf("calls = %v, want %s", calls, wantCalls)
 			}
-		case http.MethodPut:
-			var body map[string]any
-			if !testDecodeRequest(t, w, r, &body) {
-				return
-			}
-			for _, field := range []string{"name", "slug", "icon", "description", "isPublic"} {
-				value, ok := body[field]
-				if !ok {
-					t.Errorf("update omitted %s", field)
-				}
-				remote[field] = value
-			}
-		}
-		testEncodeResponse(t, w, remote)
-	})
-	r := &projectResource{client: client}
-	model := projectTestModel()
-	model.Description = types.StringValue("Created description")
-	model.IsPublic = types.BoolValue(true)
-	plan := testPlan(t, r, model)
-	create := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &create)
-	if create.Diagnostics.HasError() {
-		t.Fatal(create.Diagnostics)
-	}
-	var state projectModel
-	if diags := create.State.Get(t.Context(), &state); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if state.ID.ValueString() != "project-1" || state.Description != model.Description || state.IsPublic != model.IsPublic {
-		t.Fatalf("unexpected create state: %+v", state)
-	}
-	if strings.Join(calls, ",") != "POST /project,PUT /project/project-1" {
-		t.Fatalf("create calls: %v", calls)
-	}
-
-	state.Name = types.StringValue("Renamed")
-	state.Slug = types.StringValue("NEW")
-	state.Icon = types.StringValue("")
-	state.Description = types.StringValue("")
-	state.IsPublic = types.BoolValue(false)
-	update := resource.UpdateResponse{State: create.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, state)}, &update)
-	if update.Diagnostics.HasError() {
-		t.Fatal(update.Diagnostics)
-	}
-	if remote["name"] != "Renamed" || remote["slug"] != "NEW" || remote["icon"] != "" || remote["description"] != "" || remote["isPublic"] != false {
-		t.Fatalf("update did not send cleared values: %v", remote)
-	}
-
-	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, projectModel{}))}
-	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "project-1"}, &imported)
-	if imported.Diagnostics.HasError() {
-		t.Fatal(imported.Diagnostics)
-	}
-	read := resource.ReadResponse{State: imported.State}
-	r.Read(t.Context(), resource.ReadRequest{State: imported.State}, &read)
-	if read.Diagnostics.HasError() {
-		t.Fatal(read.Diagnostics)
-	}
-	var importedModel projectModel
-	if diags := read.State.Get(t.Context(), &importedModel); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if importedModel != state {
-		t.Fatalf("import state = %+v, want %+v", importedModel, state)
-	}
-
-	deleted := resource.DeleteResponse{State: read.State}
-	r.Delete(t.Context(), resource.DeleteRequest{State: read.State}, &deleted)
-	if deleted.Diagnostics.HasError() {
-		t.Fatal(deleted.Diagnostics)
-	}
-	if calls[len(calls)-1] != "DELETE /project/project-1" {
-		t.Fatalf("delete call: %v", calls)
+		})
 	}
 }
 

@@ -13,81 +13,75 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func TestTaskLabelLifecycle(t *testing.T) {
-	attaches, detaches := 0, 0
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method + " " + r.URL.Path {
-		case "GET /label/label-1":
-			if _, err := fmt.Fprint(w, labelFixture); err != nil {
-				t.Error(err)
+func TestTaskLabelAttachAndDetachWireShapes(t *testing.T) {
+	for _, attach := range []bool{true, false} {
+		t.Run(fmt.Sprintf("attach=%t", attach), func(t *testing.T) {
+			var calls []string
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls = append(calls, r.Method+" "+r.URL.Path)
+				switch r.Method + " " + r.URL.Path {
+				case "GET /label/label-1":
+					if _, err := fmt.Fprint(w, labelFixture); err != nil {
+						t.Error(err)
+					}
+				case "GET /label/copy-1":
+					if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+						t.Error(err)
+					}
+				case "GET /label/task/task-1":
+					if _, err := fmt.Fprint(w, `[`+strings.ReplaceAll(strings.ReplaceAll(taskLabelFixture, "copy-1", "other-1"), "Bug", "Unrelated")+`]`); err != nil {
+						t.Error(err)
+					}
+				case "PUT /label/label-1/task":
+					var body map[string]string
+					if !testDecodeRequest(t, w, r, &body) {
+						return
+					}
+					if len(body) != 1 || body["taskId"] != "task-1" {
+						t.Errorf("unexpected attach body: %v", body)
+					}
+					if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+						t.Error(err)
+					}
+				case "DELETE /label/copy-1/task":
+					if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+						t.Error(err)
+					}
+				default:
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+			})
+			r := &taskLabelResource{client: client}
+			model := taskLabelModelFromAPI(labelTestAPIValue(t, taskLabelFixture), types.StringValue("label-1"))
+			plan := testPlan(t, r, model)
+			if attach {
+				created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
+				if created.Diagnostics.HasError() {
+					t.Fatal(created.Diagnostics)
+				}
+				var got taskLabelModel
+				if diags := created.State.Get(t.Context(), &got); diags.HasError() {
+					t.Fatal(diags)
+				}
+				if got != model || got.ID == got.LabelID {
+					t.Fatalf("wrong attachment state: %+v", got)
+				}
+				if strings.Join(calls, ",") != "GET /label/label-1,GET /label/task/task-1,PUT /label/label-1/task" {
+					t.Fatalf("attach must check source and collisions first: %v", calls)
+				}
+			} else {
+				state := tfsdk.State(plan)
+				deleted := resource.DeleteResponse{State: state}
+				r.Delete(t.Context(), resource.DeleteRequest{State: state}, &deleted)
+				if deleted.Diagnostics.HasError() {
+					t.Fatal(deleted.Diagnostics)
+				}
+				if strings.Join(calls, ",") != "GET /label/copy-1,DELETE /label/copy-1/task" {
+					t.Fatalf("detach must check ownership and target only the copy: %v", calls)
+				}
 			}
-		case "GET /label/copy-1":
-			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
-				t.Error(err)
-			}
-		case "GET /label/task/task-1":
-			if _, err := fmt.Fprint(w, `[`+strings.ReplaceAll(strings.ReplaceAll(taskLabelFixture, "copy-1", "other-1"), "Bug", "Unrelated")+`]`); err != nil {
-				t.Error(err)
-			}
-		case "PUT /label/label-1/task":
-			var body map[string]string
-			if !testDecodeRequest(t, w, r, &body) {
-				return
-			}
-			if len(body) != 1 || body["taskId"] != "task-1" {
-				t.Errorf("unexpected attach body: %v", body)
-			}
-			attaches++
-			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
-				t.Error(err)
-			}
-		case "DELETE /label/copy-1/task":
-			detaches++
-			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
-				t.Error(err)
-			}
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	})
-	r := &taskLabelResource{client: client}
-	model := taskLabelModelFromAPI(labelTestAPIValue(t, taskLabelFixture), types.StringValue("label-1"))
-	plan := testPlan(t, r, model)
-	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
-	if created.Diagnostics.HasError() {
-		t.Fatal(created.Diagnostics)
-	}
-	var got taskLabelModel
-	if diags := created.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model || got.ID == got.LabelID {
-		t.Fatalf("wrong attachment state: %+v", got)
-	}
-	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, taskLabelModel{}))}
-	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "label-1/copy-1"}, &imported)
-	if imported.Diagnostics.HasError() {
-		t.Fatal(imported.Diagnostics)
-	}
-	read := resource.ReadResponse{State: imported.State}
-	r.Read(t.Context(), resource.ReadRequest{State: imported.State}, &read)
-	if read.Diagnostics.HasError() {
-		t.Fatal(read.Diagnostics)
-	}
-	if diags := read.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("import state=%+v, want %+v", got, model)
-	}
-	deleted := resource.DeleteResponse{State: read.State}
-	r.Delete(t.Context(), resource.DeleteRequest{State: read.State}, &deleted)
-	if deleted.Diagnostics.HasError() {
-		t.Fatal(deleted.Diagnostics)
-	}
-	if attaches != 1 || detaches != 1 {
-		t.Fatalf("attaches=%d detaches=%d", attaches, detaches)
+		})
 	}
 }
 

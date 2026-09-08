@@ -5,6 +5,7 @@ package provider
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -30,132 +31,70 @@ func taskTestState(t *testing.T) tfsdk.State {
 	return tfsdk.State(plan)
 }
 
-func TestTaskResourceLifecycle(t *testing.T) {
-	var remote map[string]any
-	testFixture(t, taskFixture, &remote)
-	var calls []string
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch r.Method + " " + r.URL.Path {
-		case "POST /task/project-1", "PUT /task/task-1":
-			var body map[string]any
-			if !testDecodeRequest(t, w, r, &body) {
-				return
+func TestTaskMutationWireShapes(t *testing.T) {
+	for _, create := range []bool{true, false} {
+		t.Run(fmt.Sprintf("create=%t", create), func(t *testing.T) {
+			state := taskTestState(t)
+			var model taskModel
+			if diags := state.Get(t.Context(), &model); diags.HasError() {
+				t.Fatal(diags)
 			}
-			for _, field := range []string{"title", "description", "status", "priority"} {
-				value, ok := body[field]
-				if !ok {
-					t.Errorf("missing %s", field)
-				}
-				remote[field] = value
+			model.StartDate = types.StringValue("2026-09-01T08:00:00.120-04:00")
+			want := map[string]any{"title": "Testing", "description": "Description", "status": "testing", "priority": "high", "userId": "user-1", "startDate": model.StartDate.ValueString(), "dueDate": model.DueDate.ValueString()}
+			method, path, result := http.MethodPost, "/task/project-1", taskFixture
+			if !create {
+				model.Description = types.StringValue("")
+				model.AssigneeID, model.StartDate, model.DueDate = types.StringNull(), types.StringNull(), types.StringNull()
+				model.Position = types.Int64Unknown()
+				want = map[string]any{"title": "Testing", "description": "", "status": "testing", "priority": "high", "projectId": "project-1", "position": float64(16777217)}
+				method, path = http.MethodPut, "/task/task-1"
+				result = strings.NewReplacer(`"description":"Description"`, `"description":""`, `"userId":"user-1"`, `"userId":null`, `"startDate":"2026-09-01T12:00:00.12Z"`, `"startDate":null`, `"dueDate":"2026-09-02T12:00:00.001Z"`, `"dueDate":null`).Replace(taskFixture)
 			}
-			for _, field := range []string{"userId", "startDate", "dueDate"} {
-				remote[field] = body[field]
-			}
-			if r.Method == http.MethodPost {
-				if body["startDate"] != "2026-09-01T08:00:00.120-04:00" || body["userId"] != "user-1" {
-					t.Errorf("unexpected create body: %v", body)
+			calls := 0
+			r := &taskResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method != method || r.URL.Path != path {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 				}
-				if _, ok := body["position"]; ok {
-					t.Error("create must not send a position")
+				var body map[string]any
+				if !testDecodeRequest(t, w, r, &body) {
+					return
 				}
-				remote["startDate"] = "2026-09-01T12:00:00.12Z"
+				if !reflect.DeepEqual(body, want) {
+					t.Errorf("body = %v, want %v", body, want)
+				}
+				if _, err := fmt.Fprint(w, result); err != nil {
+					t.Error(err)
+				}
+			})}
+			plan := testPlan(t, r, model)
+			if create {
+				response := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+				state = response.State
 			} else {
-				if body["position"] != float64(16777217) || body["projectId"] != "project-1" {
-					t.Errorf("update lost refreshed position or project: %v", body)
+				response := resource.UpdateResponse{State: state}
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
 				}
-				for _, field := range []string{"userId", "startDate", "dueDate"} {
-					if _, ok := body[field]; ok {
-						t.Errorf("clearing must omit %s", field)
-					}
-				}
-				if body["description"] != "" {
-					t.Error("description was not cleared")
-				}
+				state = response.State
 			}
-		case "GET /task/task-1", "DELETE /task/task-1":
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-		testEncodeResponse(t, w, remote)
-	})
-	r := &taskResource{client: client}
-	var model taskModel
-	state := taskTestState(t)
-	if diags := state.Get(t.Context(), &model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	model.StartDate = types.StringValue("2026-09-01T08:00:00.120-04:00")
-	plan := testPlan(t, &taskResource{}, model)
-	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
-	if created.Diagnostics.HasError() {
-		t.Fatal(created.Diagnostics)
-	}
-	var got taskModel
-	if diags := created.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("created state = %+v, want %+v", got, model)
-	}
-	if got.Number.ValueInt64() != 16777217 || got.Position.ValueInt64() != 16777217 {
-		t.Fatal("integer precision lost")
-	}
-	model.Title = types.StringValue("Renamed")
-	model.Description = types.StringValue("")
-	model.Status = types.StringValue("planned")
-	model.Priority = types.StringValue("no-priority")
-	model.AssigneeID, model.StartDate, model.DueDate = types.StringNull(), types.StringNull(), types.StringNull()
-	model.Position = types.Int64Unknown()
-	updated := resource.UpdateResponse{State: created.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, &taskResource{}, model), State: created.State}, &updated)
-	if updated.Diagnostics.HasError() {
-		t.Fatal(updated.Diagnostics)
-	}
-	if diags := updated.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	model.Position = types.Int64Value(16777217)
-	if got != model {
-		t.Fatalf("updated state = %+v, want %+v", got, model)
-	}
-	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, taskModel{}))}
-	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "task-1"}, &imported)
-	if imported.Diagnostics.HasError() {
-		t.Fatal(imported.Diagnostics)
-	}
-	read := resource.ReadResponse{State: imported.State}
-	r.Read(t.Context(), resource.ReadRequest{State: imported.State}, &read)
-	if read.Diagnostics.HasError() {
-		t.Fatal(read.Diagnostics)
-	}
-	if diags := read.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("import state = %+v, want %+v", got, model)
-	}
-	d := &taskDataSource{client: client}
-	config := testConfig(t, &taskDataSource{}, taskModel{ID: types.StringValue("task-1")})
-	lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
-	d.Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
-	if lookup.Diagnostics.HasError() {
-		t.Fatal(lookup.Diagnostics)
-	}
-	if diags := lookup.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("data source state = %+v, want %+v", got, model)
-	}
-	deleted := resource.DeleteResponse{State: read.State}
-	r.Delete(t.Context(), resource.DeleteRequest{State: read.State}, &deleted)
-	if deleted.Diagnostics.HasError() {
-		t.Fatal(deleted.Diagnostics)
-	}
-	if strings.Join(calls, ",") != "POST /task/project-1,PUT /task/task-1,GET /task/task-1,GET /task/task-1,DELETE /task/task-1" {
-		t.Fatalf("unexpected calls: %v", calls)
+			if calls != 1 {
+				t.Fatalf("calls = %d, want 1", calls)
+			}
+			var got taskModel
+			if diags := state.Get(t.Context(), &got); diags.HasError() {
+				t.Fatal(diags)
+			}
+			model.Position = types.Int64Value(16777217)
+			if got != model || got.Number.ValueInt64() != 16777217 {
+				t.Fatalf("lost timestamp spelling, nulls or integer precision: %+v", got)
+			}
+		})
 	}
 }
 

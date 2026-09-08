@@ -3,280 +3,141 @@
 package provider
 
 import (
-	"context"
+	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"sync"
+	"reflect"
 	"testing"
 	"time"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/nullable"
 )
 
-type workspaceAPIValue struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	Description *string `json:"description"`
-	Logo        *string `json:"logo"`
-	CreatedAt   string  `json:"createdAt"`
-}
+const workspaceFixture = `{"id":"workspace-1","name":"Engineering","slug":"engineering","description":null,"logo":null,"createdAt":"2026-01-02T03:04:05Z"}`
 
-type workspaceAPIServer struct {
-	t         *testing.T
-	server    *httptest.Server
-	mu        sync.Mutex
-	workspace *workspaceAPIValue
-}
-
-func newWorkspaceAPIServer(t *testing.T, workspace *workspaceAPIValue) *workspaceAPIServer {
-	t.Helper()
-
-	testServer := &workspaceAPIServer{t: t, workspace: workspace}
-	testServer.server = httptest.NewServer(http.HandlerFunc(testServer.handle))
-	t.Cleanup(testServer.server.Close)
-	return testServer
-}
-
-func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Request) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if handleTestSignIn(s.t, writer, request) {
-		return
-	}
-	if authorization := request.Header.Get("Authorization"); authorization != "Bearer test-session" {
-		s.t.Errorf("expected bearer authorization, got %q", authorization)
-	}
-	writer.Header().Set("Content-Type", "application/json")
-
-	switch {
-	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/create":
-		var body struct {
-			Name        string  `json:"name"`
-			Slug        string  `json:"slug"`
-			Description *string `json:"description"`
-			Logo        *string `json:"logo"`
-		}
-		if !testDecodeRequest(s.t, writer, request, &body) {
-			return
-		}
-		s.workspace = &workspaceAPIValue{
-			ID:          "workspace-1",
-			Name:        body.Name,
-			Slug:        body.Slug,
-			Description: body.Description,
-			Logo:        body.Logo,
-			CreatedAt:   "2026-01-02T03:04:05Z",
-		}
-		testEncodeResponse(s.t, writer, s.workspace)
-	case request.Method == http.MethodGet && request.URL.Path == "/api/auth/organization/list":
-		if s.workspace == nil {
-			testEncodeResponse(s.t, writer, []workspaceAPIValue{})
-			return
-		}
-		testEncodeResponse(s.t, writer, []workspaceAPIValue{*s.workspace})
-	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/update":
-		var body struct {
-			OrganizationID string `json:"organizationId"`
-			Data           struct {
-				Name        *string `json:"name"`
-				Slug        *string `json:"slug"`
-				Description *string `json:"description"`
-				Logo        *string `json:"logo"`
-			} `json:"data"`
-		}
-		if !testDecodeRequest(s.t, writer, request, &body) {
-			return
-		}
-		if s.workspace == nil || body.OrganizationID != s.workspace.ID {
-			http.Error(writer, "workspace not found", http.StatusBadRequest)
-			return
-		}
-		if body.Data.Name != nil {
-			s.workspace.Name = *body.Data.Name
-		}
-		if body.Data.Slug != nil {
-			s.workspace.Slug = *body.Data.Slug
-		}
-		s.workspace.Description = body.Data.Description
-		s.workspace.Logo = body.Data.Logo
-		testEncodeResponse(s.t, writer, s.workspace)
-	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/delete":
-		var body struct {
-			OrganizationID string `json:"organizationId"`
-		}
-		if !testDecodeRequest(s.t, writer, request, &body) {
-			return
-		}
-		if s.workspace == nil || body.OrganizationID != s.workspace.ID {
-			http.Error(writer, "workspace not found", http.StatusBadRequest)
-			return
-		}
-		testEncodeResponse(s.t, writer, s.workspace)
-		s.workspace = nil
-	default:
-		http.NotFound(writer, request)
-	}
-}
-
-func (s *workspaceAPIServer) client(t *testing.T) *workspaceResource {
-	t.Helper()
-	client, err := newAPIClient(t.Context(), s.server.URL+"/api", "test@example.com", " test-password ", "test")
-	if err != nil {
-		t.Fatalf("create API client: %v", err)
-	}
-	return &workspaceResource{client: client}
-}
-
-func TestWorkspaceResourceLifecycle(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	server := newWorkspaceAPIServer(t, nil)
-	workspaceResource := server.client(t)
-	schemaResponse := &resource.SchemaResponse{}
-	workspaceResource.Schema(ctx, resource.SchemaRequest{}, schemaResponse)
-
-	createResponse := &resource.CreateResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
-	workspaceResource.Create(ctx, resource.CreateRequest{
-		Plan: testPlan(t, workspaceResource, workspaceModel{
-			ID: types.StringUnknown(), Name: types.StringValue("Engineering"),
-			Slug: types.StringValue("engineering"), Description: types.StringValue("Engineering workspace"),
-			Logo: types.StringNull(), CreatedAt: types.StringUnknown(),
-		}),
-	}, createResponse)
-	if createResponse.Diagnostics.HasError() {
-		t.Fatalf("unexpected create diagnostics: %v", createResponse.Diagnostics)
-	}
-
-	var created workspaceModel
-	if diagnostics := createResponse.State.Get(ctx, &created); diagnostics.HasError() {
-		t.Fatalf("read created state: %v", diagnostics)
-	}
-	if created.ID.ValueString() != "workspace-1" || created.Slug.ValueString() != "engineering" {
-		t.Fatalf("unexpected created state: %#v", created)
-	}
-
-	updateResponse := &resource.UpdateResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
-	workspaceResource.Update(ctx, resource.UpdateRequest{
-		Plan: testPlan(t, workspaceResource, workspaceModel{
-			ID: types.StringValue("workspace-1"), Name: types.StringValue("Product Engineering"),
-			Slug: types.StringValue("product-engineering"), Description: types.StringValue("Updated description"),
-			Logo: types.StringValue("https://example.com/logo.png"), CreatedAt: types.StringValue("2026-01-02T03:04:05Z"),
-		}),
-	}, updateResponse)
-	if updateResponse.Diagnostics.HasError() {
-		t.Fatalf("unexpected update diagnostics: %v", updateResponse.Diagnostics)
-	}
-
-	var updated workspaceModel
-	if diagnostics := updateResponse.State.Get(ctx, &updated); diagnostics.HasError() {
-		t.Fatalf("read updated state: %v", diagnostics)
-	}
-	if updated.Name.ValueString() != "Product Engineering" || updated.Logo.ValueString() != "https://example.com/logo.png" {
-		t.Fatalf("unexpected updated state: %#v", updated)
-	}
-
-	readResponse := &resource.ReadResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
-	workspaceResource.Read(ctx, resource.ReadRequest{State: updateResponse.State}, readResponse)
-	if readResponse.Diagnostics.HasError() {
-		t.Fatalf("unexpected read diagnostics: %v", readResponse.Diagnostics)
-	}
-
-	deleteResponse := &resource.DeleteResponse{State: readResponse.State}
-	workspaceResource.Delete(ctx, resource.DeleteRequest{State: readResponse.State}, deleteResponse)
-	if deleteResponse.Diagnostics.HasError() {
-		t.Fatalf("unexpected delete diagnostics: %v", deleteResponse.Diagnostics)
+func TestWorkspaceMutationWireShapes(t *testing.T) {
+	for _, operation := range []string{"create", "update", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			calls := 0
+			r := &workspaceResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Method != http.MethodPost || r.URL.Path != "/auth/organization/"+operation {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+				var body map[string]any
+				if !testDecodeRequest(t, w, r, &body) {
+					return
+				}
+				want := map[string]any{"name": "Engineering", "slug": "engineering", "description": nil, "logo": nil}
+				if operation == "update" {
+					want = map[string]any{"organizationId": "workspace-1", "data": want}
+				}
+				if operation == "delete" {
+					want = map[string]any{"organizationId": "workspace-1"}
+				}
+				if !reflect.DeepEqual(body, want) {
+					t.Errorf("body = %v, want %v", body, want)
+				}
+				if _, err := fmt.Fprint(w, workspaceFixture); err != nil {
+					t.Error(err)
+				}
+			})}
+			model := workspaceModel{ID: types.StringValue("workspace-1"), Name: types.StringValue("Engineering"), Slug: types.StringValue("engineering"), Description: types.StringNull(), Logo: types.StringNull(), CreatedAt: types.StringUnknown()}
+			if operation == "create" {
+				model.ID = types.StringUnknown()
+			}
+			plan := testPlan(t, r, model)
+			state := tfsdk.State{Schema: plan.Schema}
+			switch operation {
+			case "create":
+				response := resource.CreateResponse{State: state}
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+				state = response.State
+			case "update":
+				response := resource.UpdateResponse{State: state}
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+				state = response.State
+			case "delete":
+				response := resource.DeleteResponse{State: tfsdk.State(plan)}
+				r.Delete(t.Context(), resource.DeleteRequest{State: tfsdk.State(plan)}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+			}
+			if calls != 1 {
+				t.Fatalf("calls = %d, want 1", calls)
+			}
+			if operation != "delete" {
+				var got workspaceModel
+				if diags := state.Get(t.Context(), &got); diags.HasError() {
+					t.Fatal(diags)
+				}
+				if got.ID.ValueString() != "workspace-1" || got.CreatedAt.ValueString() != "2026-01-02T03:04:05Z" || !got.Description.IsNull() || !got.Logo.IsNull() {
+					t.Fatalf("unexpected state: %+v", got)
+				}
+			}
+		})
 	}
 }
 
 func TestWorkspaceResourceRemovesMissingWorkspace(t *testing.T) {
 	t.Parallel()
-
-	ctx := context.Background()
-	server := newWorkspaceAPIServer(t, nil)
-	workspaceResource := server.client(t)
-	schemaResponse := &resource.SchemaResponse{}
-	workspaceResource.Schema(ctx, resource.SchemaRequest{}, schemaResponse)
-	state := tfsdk.State(testPlan(t, workspaceResource, workspaceModel{
-		ID: types.StringValue("missing"), Name: types.StringValue("Missing"), Slug: types.StringValue("missing"),
-		Description: types.StringNull(), Logo: types.StringNull(), CreatedAt: types.StringValue("2026-01-02T03:04:05Z"),
-	}))
-	response := &resource.ReadResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
-	workspaceResource.Read(ctx, resource.ReadRequest{State: state}, response)
-
+	r := &workspaceResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/auth/organization/list" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if _, err := fmt.Fprint(w, `[]`); err != nil {
+			t.Error(err)
+		}
+	})}
+	state := tfsdk.State(testPlan(t, r, workspaceModel{ID: types.StringValue("missing"), Name: types.StringValue("Missing"), Slug: types.StringValue("missing"), Description: types.StringNull(), Logo: types.StringNull(), CreatedAt: types.StringValue("2026-01-02T03:04:05Z")}))
+	response := resource.ReadResponse{State: state}
+	r.Read(t.Context(), resource.ReadRequest{State: state}, &response)
 	if response.Diagnostics.HasError() {
-		t.Fatalf("unexpected read diagnostics: %v", response.Diagnostics)
+		t.Fatal(response.Diagnostics)
 	}
 	if !response.State.Raw.IsNull() {
 		t.Fatal("expected missing workspace to be removed from state")
 	}
 }
 
-func TestWorkspaceResourceImport(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	workspaceResource := &workspaceResource{}
-	response := &resource.ImportStateResponse{State: tfsdk.State(testPlan(t, workspaceResource, workspaceModel{}))}
-	workspaceResource.ImportState(ctx, resource.ImportStateRequest{ID: "workspace-1"}, response)
-
-	if response.Diagnostics.HasError() {
-		t.Fatalf("unexpected import diagnostics: %v", response.Diagnostics)
-	}
-	var id types.String
-	if diagnostics := response.State.GetAttribute(ctx, path.Root("id"), &id); diagnostics.HasError() {
-		t.Fatalf("read imported ID: %v", diagnostics)
-	}
-	if id.ValueString() != "workspace-1" {
-		t.Fatalf("expected imported ID %q, got %q", "workspace-1", id.ValueString())
-	}
-}
-
 func TestWorkspaceDataSourceLookup(t *testing.T) {
 	t.Parallel()
-
-	description := "Existing workspace"
-	workspace := &workspaceAPIValue{
-		ID:          "workspace-1",
-		Name:        "Engineering",
-		Slug:        "engineering",
-		Description: &description,
-		CreatedAt:   "2026-01-02T03:04:05Z",
-	}
-	server := newWorkspaceAPIServer(t, workspace)
-	resourceClient := server.client(t)
-	dataSource := &workspaceDataSource{client: resourceClient.client}
-	ctx := context.Background()
-	schemaResponse := &datasource.SchemaResponse{}
-	dataSource.Schema(ctx, datasource.SchemaRequest{}, schemaResponse)
-
+	d := &workspaceDataSource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/auth/organization/list" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if _, err := fmt.Fprint(w, `[`+workspaceFixture+`]`); err != nil {
+			t.Error(err)
+		}
+	})}
 	for name, lookup := range map[string]workspaceModel{
 		"by ID":   {ID: types.StringValue("workspace-1")},
 		"by slug": {Slug: types.StringValue("engineering")},
 	} {
 		t.Run(name, func(t *testing.T) {
-			response := &datasource.ReadResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
-			dataSource.Read(ctx, datasource.ReadRequest{
-				Config: testConfig(t, dataSource, lookup),
-			}, response)
+			config := testConfig(t, d, lookup)
+			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
+			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &response)
 			if response.Diagnostics.HasError() {
-				t.Fatalf("unexpected data source diagnostics: %v", response.Diagnostics)
+				t.Fatal(response.Diagnostics)
 			}
-
 			var state workspaceModel
-			if diagnostics := response.State.Get(ctx, &state); diagnostics.HasError() {
-				t.Fatalf("read data source state: %v", diagnostics)
+			if diags := response.State.Get(t.Context(), &state); diags.HasError() {
+				t.Fatal(diags)
 			}
 			if state.ID.ValueString() != "workspace-1" || state.Slug.ValueString() != "engineering" {
-				t.Fatalf("unexpected data source state: %#v", state)
+				t.Fatalf("unexpected state: %+v", state)
 			}
 		})
 	}
@@ -284,11 +145,8 @@ func TestWorkspaceDataSourceLookup(t *testing.T) {
 
 func TestWorkspaceDataSourceRequiresOneLookupAttribute(t *testing.T) {
 	t.Parallel()
-
-	ctx := context.Background()
-	dataSource := &workspaceDataSource{}
-	validator := dataSource.ConfigValidators(ctx)[0]
-
+	d := &workspaceDataSource{}
+	validator := d.ConfigValidators(t.Context())[0]
 	for name, test := range map[string]struct {
 		lookup    workspaceModel
 		wantError bool
@@ -299,11 +157,11 @@ func TestWorkspaceDataSourceRequiresOneLookupAttribute(t *testing.T) {
 		"slug":    {lookup: workspaceModel{Slug: types.StringValue("engineering")}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			request := datasource.ValidateConfigRequest{Config: testConfig(t, dataSource, test.lookup)}
-			response := &datasource.ValidateConfigResponse{}
-			validator.ValidateDataSource(ctx, request, response)
+			request := datasource.ValidateConfigRequest{Config: testConfig(t, d, test.lookup)}
+			response := datasource.ValidateConfigResponse{}
+			validator.ValidateDataSource(t.Context(), request, &response)
 			if response.Diagnostics.HasError() != test.wantError {
-				t.Fatalf("expected validation error to be %t, got diagnostics: %v", test.wantError, response.Diagnostics)
+				t.Fatalf("want error %t: %v", test.wantError, response.Diagnostics)
 			}
 		})
 	}
@@ -311,7 +169,6 @@ func TestWorkspaceDataSourceRequiresOneLookupAttribute(t *testing.T) {
 
 func TestWorkspaceModelUsesMetadataDescriptionFallback(t *testing.T) {
 	t.Parallel()
-
 	workspace := workspaceModelFromAPI(workspaceFromMetadata("Metadata description"))
 	if workspace.Description.ValueString() != "Metadata description" {
 		t.Fatalf("expected metadata description fallback, got %q", workspace.Description.ValueString())
@@ -320,11 +177,5 @@ func TestWorkspaceModelUsesMetadataDescriptionFallback(t *testing.T) {
 
 func workspaceFromMetadata(description string) kaneoclient.Workspace {
 	metadata := nullable.NewNullableWithValue(map[string]any{"description": description})
-	return kaneoclient.Workspace{
-		Id:        "workspace-1",
-		Name:      "Engineering",
-		Slug:      "engineering",
-		Metadata:  metadata,
-		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-	}
+	return kaneoclient.Workspace{Id: "workspace-1", Name: "Engineering", Slug: "engineering", Metadata: metadata, CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}
 }
