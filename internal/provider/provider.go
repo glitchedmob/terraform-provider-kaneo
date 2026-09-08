@@ -96,6 +96,7 @@ func (p *KaneoProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		newWorkspaceResource,
 		newProjectResource,
+		newColumnResource,
 	}
 }
 
@@ -103,6 +104,7 @@ func (p *KaneoProvider) DataSources(context.Context) []func() datasource.DataSou
 	return []func() datasource.DataSource{
 		newWorkspaceDataSource,
 		newProjectDataSource,
+		newColumnDataSource,
 	}
 }
 

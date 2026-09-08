@@ -3,6 +3,16 @@ info:
   title: Kaneo client generation fixes
   version: 1.0.0
 actions:
+  - target: $.components.schemas.Column.properties.position
+    description: Column positions are stored as PostgreSQL integers, not floating-point numbers.
+    update:
+      type: integer
+      format: int32
+  - target: $.paths['/column/reorder/{projectId}'].put.requestBody.content['application/json'].schema.properties.columns.items.properties.position
+    description: Reordering writes the same integer column position.
+    update:
+      type: integer
+      format: int32
   - target: $.paths['/notification'].post.responses['200'].content['application/json'].schema.allOf
     description: Remove the invalid intersection used to express a nullable response.
     remove: true
