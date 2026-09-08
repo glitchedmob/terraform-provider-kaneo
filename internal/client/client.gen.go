@@ -17912,11 +17912,11 @@ type DeleteOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *string
+	JSON200 *Workspace
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r DeleteOrganizationResponse) GetJSON200() *string {
+func (r DeleteOrganizationResponse) GetJSON200() *Workspace {
 	return r.JSON200
 }
 
@@ -27448,7 +27448,7 @@ func ParseDeleteOrganizationResponse(rsp *http.Response) (*DeleteOrganizationRes
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
+		var dest Workspace
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
