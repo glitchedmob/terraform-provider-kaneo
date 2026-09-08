@@ -1607,6 +1607,31 @@ type WorkspaceMember struct {
 	Role string `json:"role"`
 }
 
+// WorkspaceRole defines model for WorkspaceRole.
+type WorkspaceRole struct {
+	Id             string              `json:"id"`
+	OrganizationId string              `json:"organizationId"`
+	Permission     map[string][]string `json:"permission"`
+	Role           string              `json:"role"`
+}
+
+// WorkspaceRoleResult defines model for WorkspaceRoleResult.
+type WorkspaceRoleResult struct {
+	RoleData WorkspaceRole `json:"roleData"`
+	Success  bool          `json:"success"`
+}
+
+// WorkspaceRoleSuccess defines model for WorkspaceRoleSuccess.
+type WorkspaceRoleSuccess struct {
+	Success bool `json:"success"`
+}
+
+// WorkspaceRoleUpdate defines model for WorkspaceRoleUpdate.
+type WorkspaceRoleUpdate struct {
+	Permission *map[string][]string `json:"permission,omitempty"`
+	RoleName   *string              `json:"roleName,omitempty"`
+}
+
 // DeleteCommentJSONBody defines parameters for DeleteComment.
 type DeleteCommentJSONBody struct {
 	ActivityId string `json:"activityId"`
@@ -1734,16 +1759,11 @@ type CreateOrganizationJSONBody struct {
 	UserId *string `json:"userId,omitempty"`
 }
 
-// CreateOrganizationRoleJSONBody defines parameters for CreateOrganizationRole.
-type CreateOrganizationRoleJSONBody struct {
-	AdditionalFields *map[string]interface{} `json:"additionalFields,omitempty"`
-	OrganizationId   *string                 `json:"organizationId,omitempty"`
-
-	// Permission The permission to assign to the role
-	Permission map[string][]string `json:"permission"`
-
-	// Role The name of the role to create
-	Role string `json:"role"`
+// CreateWorkspaceRoleJSONBody defines parameters for CreateWorkspaceRole.
+type CreateWorkspaceRoleJSONBody struct {
+	OrganizationId string              `json:"organizationId"`
+	Permission     map[string][]string `json:"permission"`
+	Role           string              `json:"role"`
 }
 
 // CreateOrganizationTeamJSONBody defines parameters for CreateOrganizationTeam.
@@ -1761,27 +1781,26 @@ type DeleteOrganizationJSONBody struct {
 	OrganizationId string `json:"organizationId"`
 }
 
-// DeleteOrganizationRoleJSONBody defines parameters for DeleteOrganizationRole.
-type DeleteOrganizationRoleJSONBody struct {
-	OrganizationId *string `json:"organizationId,omitempty"`
-	union          json.RawMessage
+// DeleteWorkspaceRoleJSONBody defines parameters for DeleteWorkspaceRole.
+type DeleteWorkspaceRoleJSONBody struct {
+	OrganizationId string `json:"organizationId"`
+	RoleId         string `json:"roleId"`
 }
 
-// DeleteOrganizationRoleJSONBody0 defines parameters for DeleteOrganizationRole.
-type DeleteOrganizationRoleJSONBody0 struct {
-	// RoleName The name of the role to delete
-	RoleName string `json:"roleName"`
-}
-
-// DeleteOrganizationRoleJSONBody1 defines parameters for DeleteOrganizationRole.
-type DeleteOrganizationRoleJSONBody1 struct {
-	// RoleId The id of the role to delete
-	RoleId string `json:"roleId"`
+// GetWorkspacePresenceParams defines parameters for GetWorkspacePresence.
+type GetWorkspacePresenceParams struct {
+	OrganizationId string `form:"organizationId" json:"organizationId"`
 }
 
 // GetOrganizationInvitationParams defines parameters for GetOrganizationInvitation.
 type GetOrganizationInvitationParams struct {
 	Id string `form:"id" json:"id"`
+}
+
+// GetWorkspaceRoleParams defines parameters for GetWorkspaceRole.
+type GetWorkspaceRoleParams struct {
+	OrganizationId string `form:"organizationId" json:"organizationId"`
+	RoleId         string `form:"roleId" json:"roleId"`
 }
 
 // HasOrganizationPermissionJSONBody defines parameters for HasOrganizationPermission.
@@ -1835,6 +1854,11 @@ type InviteOrganizationMemberJSONBody_TeamId struct {
 type LeaveOrganizationJSONBody struct {
 	// OrganizationId The organization Id for the member to leave. Eg: "organization-id"
 	OrganizationId string `json:"organizationId"`
+}
+
+// ListWorkspaceRolesParams defines parameters for ListWorkspaceRoles.
+type ListWorkspaceRolesParams struct {
+	OrganizationId string `form:"organizationId" json:"organizationId"`
 }
 
 // RejectOrganizationInvitationJSONBody defines parameters for RejectOrganizationInvitation.
@@ -1939,26 +1963,11 @@ type UpdateOrganizationMemberRoleJSONBody_Role struct {
 	union json.RawMessage
 }
 
-// UpdateOrganizationRoleJSONBody defines parameters for UpdateOrganizationRole.
-type UpdateOrganizationRoleJSONBody struct {
-	Data struct {
-		Permission *map[string][]string `json:"permission,omitempty"`
-		RoleName   *string              `json:"roleName,omitempty"`
-	} `json:"data"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	union          json.RawMessage
-}
-
-// UpdateOrganizationRoleJSONBody0 defines parameters for UpdateOrganizationRole.
-type UpdateOrganizationRoleJSONBody0 struct {
-	// RoleName The name of the role to update
-	RoleName string `json:"roleName"`
-}
-
-// UpdateOrganizationRoleJSONBody1 defines parameters for UpdateOrganizationRole.
-type UpdateOrganizationRoleJSONBody1 struct {
-	// RoleId The id of the role to update
-	RoleId string `json:"roleId"`
+// UpdateWorkspaceRoleJSONBody defines parameters for UpdateWorkspaceRole.
+type UpdateWorkspaceRoleJSONBody struct {
+	Data           WorkspaceRoleUpdate `json:"data"`
+	OrganizationId string              `json:"organizationId"`
+	RoleId         string              `json:"roleId"`
 }
 
 // UpdateOrganizationTeamJSONBody defines parameters for UpdateOrganizationTeam.
@@ -2610,8 +2619,8 @@ type CheckOrganizationSlugJSONRequestBody CheckOrganizationSlugJSONBody
 // CreateOrganizationJSONRequestBody defines body for CreateOrganization for application/json ContentType.
 type CreateOrganizationJSONRequestBody CreateOrganizationJSONBody
 
-// CreateOrganizationRoleJSONRequestBody defines body for CreateOrganizationRole for application/json ContentType.
-type CreateOrganizationRoleJSONRequestBody CreateOrganizationRoleJSONBody
+// CreateWorkspaceRoleJSONRequestBody defines body for CreateWorkspaceRole for application/json ContentType.
+type CreateWorkspaceRoleJSONRequestBody CreateWorkspaceRoleJSONBody
 
 // CreateOrganizationTeamJSONRequestBody defines body for CreateOrganizationTeam for application/json ContentType.
 type CreateOrganizationTeamJSONRequestBody CreateOrganizationTeamJSONBody
@@ -2619,8 +2628,8 @@ type CreateOrganizationTeamJSONRequestBody CreateOrganizationTeamJSONBody
 // DeleteOrganizationJSONRequestBody defines body for DeleteOrganization for application/json ContentType.
 type DeleteOrganizationJSONRequestBody DeleteOrganizationJSONBody
 
-// DeleteOrganizationRoleJSONRequestBody defines body for DeleteOrganizationRole for application/json ContentType.
-type DeleteOrganizationRoleJSONRequestBody DeleteOrganizationRoleJSONBody
+// DeleteWorkspaceRoleJSONRequestBody defines body for DeleteWorkspaceRole for application/json ContentType.
+type DeleteWorkspaceRoleJSONRequestBody DeleteWorkspaceRoleJSONBody
 
 // HasOrganizationPermissionJSONRequestBody defines body for HasOrganizationPermission for application/json ContentType.
 type HasOrganizationPermissionJSONRequestBody HasOrganizationPermissionJSONBody
@@ -2655,8 +2664,8 @@ type UpdateOrganizationJSONRequestBody UpdateOrganizationJSONBody
 // UpdateOrganizationMemberRoleJSONRequestBody defines body for UpdateOrganizationMemberRole for application/json ContentType.
 type UpdateOrganizationMemberRoleJSONRequestBody UpdateOrganizationMemberRoleJSONBody
 
-// UpdateOrganizationRoleJSONRequestBody defines body for UpdateOrganizationRole for application/json ContentType.
-type UpdateOrganizationRoleJSONRequestBody UpdateOrganizationRoleJSONBody
+// UpdateWorkspaceRoleJSONRequestBody defines body for UpdateWorkspaceRole for application/json ContentType.
+type UpdateWorkspaceRoleJSONRequestBody UpdateWorkspaceRoleJSONBody
 
 // UpdateOrganizationTeamJSONRequestBody defines body for UpdateOrganizationTeam for application/json ContentType.
 type UpdateOrganizationTeamJSONRequestBody UpdateOrganizationTeamJSONBody
@@ -2813,102 +2822,6 @@ type UploadUserAvatarJSONRequestBody UploadUserAvatarJSONBody
 
 // UpsertWorkflowRuleJSONRequestBody defines body for UpsertWorkflowRule for application/json ContentType.
 type UpsertWorkflowRuleJSONRequestBody UpsertWorkflowRuleJSONBody
-
-// AsDeleteOrganizationRoleJSONBody0 returns the union data inside the DeleteOrganizationRoleJSONBody as a DeleteOrganizationRoleJSONBody0
-func (t DeleteOrganizationRoleJSONBody) AsDeleteOrganizationRoleJSONBody0() (DeleteOrganizationRoleJSONBody0, error) {
-	var body DeleteOrganizationRoleJSONBody0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDeleteOrganizationRoleJSONBody0 overwrites any union data inside the DeleteOrganizationRoleJSONBody as the provided DeleteOrganizationRoleJSONBody0
-func (t *DeleteOrganizationRoleJSONBody) FromDeleteOrganizationRoleJSONBody0(v DeleteOrganizationRoleJSONBody0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDeleteOrganizationRoleJSONBody0 performs a merge with any union data inside the DeleteOrganizationRoleJSONBody, using the provided DeleteOrganizationRoleJSONBody0
-func (t *DeleteOrganizationRoleJSONBody) MergeDeleteOrganizationRoleJSONBody0(v DeleteOrganizationRoleJSONBody0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDeleteOrganizationRoleJSONBody1 returns the union data inside the DeleteOrganizationRoleJSONBody as a DeleteOrganizationRoleJSONBody1
-func (t DeleteOrganizationRoleJSONBody) AsDeleteOrganizationRoleJSONBody1() (DeleteOrganizationRoleJSONBody1, error) {
-	var body DeleteOrganizationRoleJSONBody1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDeleteOrganizationRoleJSONBody1 overwrites any union data inside the DeleteOrganizationRoleJSONBody as the provided DeleteOrganizationRoleJSONBody1
-func (t *DeleteOrganizationRoleJSONBody) FromDeleteOrganizationRoleJSONBody1(v DeleteOrganizationRoleJSONBody1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDeleteOrganizationRoleJSONBody1 performs a merge with any union data inside the DeleteOrganizationRoleJSONBody, using the provided DeleteOrganizationRoleJSONBody1
-func (t *DeleteOrganizationRoleJSONBody) MergeDeleteOrganizationRoleJSONBody1(v DeleteOrganizationRoleJSONBody1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DeleteOrganizationRoleJSONBody) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = json.Unmarshal(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if t.OrganizationId != nil {
-		object["organizationId"], err = json.Marshal(t.OrganizationId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'organizationId': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
-	return b, err
-}
-
-func (t *DeleteOrganizationRoleJSONBody) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["organizationId"]; found {
-		err = json.Unmarshal(raw, &t.OrganizationId)
-		if err != nil {
-			return fmt.Errorf("error reading 'organizationId': %w", err)
-		}
-	}
-
-	return err
-}
 
 // AsInviteOrganizationMemberJSONBodyRole0 returns the union data inside the InviteOrganizationMemberJSONBody_Role as a InviteOrganizationMemberJSONBodyRole0
 func (t InviteOrganizationMemberJSONBody_Role) AsInviteOrganizationMemberJSONBodyRole0() (InviteOrganizationMemberJSONBodyRole0, error) {
@@ -3093,114 +3006,6 @@ func (t UpdateOrganizationMemberRoleJSONBody_Role) MarshalJSON() ([]byte, error)
 
 func (t *UpdateOrganizationMemberRoleJSONBody_Role) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsUpdateOrganizationRoleJSONBody0 returns the union data inside the UpdateOrganizationRoleJSONBody as a UpdateOrganizationRoleJSONBody0
-func (t UpdateOrganizationRoleJSONBody) AsUpdateOrganizationRoleJSONBody0() (UpdateOrganizationRoleJSONBody0, error) {
-	var body UpdateOrganizationRoleJSONBody0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromUpdateOrganizationRoleJSONBody0 overwrites any union data inside the UpdateOrganizationRoleJSONBody as the provided UpdateOrganizationRoleJSONBody0
-func (t *UpdateOrganizationRoleJSONBody) FromUpdateOrganizationRoleJSONBody0(v UpdateOrganizationRoleJSONBody0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeUpdateOrganizationRoleJSONBody0 performs a merge with any union data inside the UpdateOrganizationRoleJSONBody, using the provided UpdateOrganizationRoleJSONBody0
-func (t *UpdateOrganizationRoleJSONBody) MergeUpdateOrganizationRoleJSONBody0(v UpdateOrganizationRoleJSONBody0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsUpdateOrganizationRoleJSONBody1 returns the union data inside the UpdateOrganizationRoleJSONBody as a UpdateOrganizationRoleJSONBody1
-func (t UpdateOrganizationRoleJSONBody) AsUpdateOrganizationRoleJSONBody1() (UpdateOrganizationRoleJSONBody1, error) {
-	var body UpdateOrganizationRoleJSONBody1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromUpdateOrganizationRoleJSONBody1 overwrites any union data inside the UpdateOrganizationRoleJSONBody as the provided UpdateOrganizationRoleJSONBody1
-func (t *UpdateOrganizationRoleJSONBody) FromUpdateOrganizationRoleJSONBody1(v UpdateOrganizationRoleJSONBody1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeUpdateOrganizationRoleJSONBody1 performs a merge with any union data inside the UpdateOrganizationRoleJSONBody, using the provided UpdateOrganizationRoleJSONBody1
-func (t *UpdateOrganizationRoleJSONBody) MergeUpdateOrganizationRoleJSONBody1(v UpdateOrganizationRoleJSONBody1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t UpdateOrganizationRoleJSONBody) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = json.Unmarshal(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	object["data"], err = json.Marshal(t.Data)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'data': %w", err)
-	}
-
-	if t.OrganizationId != nil {
-		object["organizationId"], err = json.Marshal(t.OrganizationId)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'organizationId': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
-	return b, err
-}
-
-func (t *UpdateOrganizationRoleJSONBody) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = json.Unmarshal(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["data"]; found {
-		err = json.Unmarshal(raw, &t.Data)
-		if err != nil {
-			return fmt.Errorf("error reading 'data': %w", err)
-		}
-	}
-
-	if raw, found := object["organizationId"]; found {
-		err = json.Unmarshal(raw, &t.OrganizationId)
-		if err != nil {
-			return fmt.Errorf("error reading 'organizationId': %w", err)
-		}
-	}
-
 	return err
 }
 
@@ -3495,19 +3300,13 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/organization/create (the `CreateOrganization` operationId).
 	CreateOrganization(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateOrganizationRoleWithBody Create Organization Role
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-	CreateOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// CreateWorkspaceRoleWithBody performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
+	CreateWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateOrganizationRole Create Organization Role
-	//
+	// CreateWorkspaceRole performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-	CreateOrganizationRole(ctx context.Context, body CreateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateWorkspaceRole(ctx context.Context, body CreateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrganizationTeamWithBody Create Organization Team
 	//
@@ -3545,19 +3344,13 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/organization/delete (the `DeleteOrganization` operationId).
 	DeleteOrganization(ctx context.Context, body DeleteOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteOrganizationRoleWithBody Delete Organization Role
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-	DeleteOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// DeleteWorkspaceRoleWithBody performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
+	DeleteWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteOrganizationRole Delete Organization Role
-	//
+	// DeleteWorkspaceRole performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-	DeleteOrganizationRole(ctx context.Context, body DeleteOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteWorkspaceRole(ctx context.Context, body DeleteWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetOrganizationActiveMember Get Organization Active Member
 	//
@@ -3571,12 +3364,8 @@ type ClientInterface interface {
 	// Corresponds with GET /auth/organization/get-active-member-role (the `GetOrganizationActiveMemberRole` operationId).
 	GetOrganizationActiveMemberRole(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetOrganizationFullOrganization Get Organization Full Organization
-	//
-	// Get the full organization.
-	//
-	// Corresponds with GET /auth/organization/get-full-organization (the `GetOrganizationFullOrganization` operationId).
-	GetOrganizationFullOrganization(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetWorkspacePresence performs a GET /auth/organization/get-full-organization (the `GetWorkspacePresence` operationId) request.
+	GetWorkspacePresence(ctx context.Context, params *GetWorkspacePresenceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetOrganizationInvitation Get Organization Invitation
 	//
@@ -3585,10 +3374,8 @@ type ClientInterface interface {
 	// Corresponds with GET /auth/organization/get-invitation (the `GetOrganizationInvitation` operationId).
 	GetOrganizationInvitation(ctx context.Context, params *GetOrganizationInvitationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetOrganizationRole Get Organization Role
-	//
-	// Corresponds with GET /auth/organization/get-role (the `GetOrganizationRole` operationId).
-	GetOrganizationRole(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetWorkspaceRole performs a GET /auth/organization/get-role (the `GetWorkspaceRole` operationId) request.
+	GetWorkspaceRole(ctx context.Context, params *GetWorkspaceRoleParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// HasOrganizationPermissionWithBody Check Organization Permission
 	//
@@ -3657,10 +3444,8 @@ type ClientInterface interface {
 	// Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
 	ListOrganizationMembers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListOrganizationRoles List Organization Roles
-	//
-	// Corresponds with GET /auth/organization/list-roles (the `ListOrganizationRoles` operationId).
-	ListOrganizationRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// ListWorkspaceRoles performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
+	ListWorkspaceRoles(ctx context.Context, params *ListWorkspaceRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationTeamMembers List Organization Team Members
 	//
@@ -3834,19 +3619,13 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/organization/update-member-role (the `UpdateOrganizationMemberRole` operationId).
 	UpdateOrganizationMemberRole(ctx context.Context, body UpdateOrganizationMemberRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateOrganizationRoleWithBody Update Organization Role
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-	UpdateOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpdateWorkspaceRoleWithBody performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
+	UpdateWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateOrganizationRole Update Organization Role
-	//
+	// UpdateWorkspaceRole performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-	UpdateOrganizationRole(ctx context.Context, body UpdateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateWorkspaceRole(ctx context.Context, body UpdateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateOrganizationTeamWithBody Update Organization Team
 	//
@@ -5704,13 +5483,10 @@ func (c *Client) CreateOrganization(ctx context.Context, body CreateOrganization
 	return c.Client.Do(req)
 }
 
-// CreateOrganizationRoleWithBody Create Organization Role
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-func (c *Client) CreateOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateOrganizationRoleRequestWithBody(c.Server, contentType, body)
+// CreateWorkspaceRoleWithBody performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) CreateWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceRoleRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5721,13 +5497,10 @@ func (c *Client) CreateOrganizationRoleWithBody(ctx context.Context, contentType
 	return c.Client.Do(req)
 }
 
-// CreateOrganizationRole Create Organization Role
-//
+// CreateWorkspaceRole performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-func (c *Client) CreateOrganizationRole(ctx context.Context, body CreateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateOrganizationRoleRequest(c.Server, body)
+func (c *Client) CreateWorkspaceRole(ctx context.Context, body CreateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWorkspaceRoleRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5814,13 +5587,10 @@ func (c *Client) DeleteOrganization(ctx context.Context, body DeleteOrganization
 	return c.Client.Do(req)
 }
 
-// DeleteOrganizationRoleWithBody Delete Organization Role
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-func (c *Client) DeleteOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteOrganizationRoleRequestWithBody(c.Server, contentType, body)
+// DeleteWorkspaceRoleWithBody performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) DeleteWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceRoleRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5831,13 +5601,10 @@ func (c *Client) DeleteOrganizationRoleWithBody(ctx context.Context, contentType
 	return c.Client.Do(req)
 }
 
-// DeleteOrganizationRole Delete Organization Role
-//
+// DeleteWorkspaceRole performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-func (c *Client) DeleteOrganizationRole(ctx context.Context, body DeleteOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteOrganizationRoleRequest(c.Server, body)
+func (c *Client) DeleteWorkspaceRole(ctx context.Context, body DeleteWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteWorkspaceRoleRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5880,13 +5647,9 @@ func (c *Client) GetOrganizationActiveMemberRole(ctx context.Context, reqEditors
 	return c.Client.Do(req)
 }
 
-// GetOrganizationFullOrganization Get Organization Full Organization
-//
-// Get the full organization.
-//
-// Corresponds with GET /auth/organization/get-full-organization (the `GetOrganizationFullOrganization` operationId).
-func (c *Client) GetOrganizationFullOrganization(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetOrganizationFullOrganizationRequest(c.Server)
+// GetWorkspacePresence performs a GET /auth/organization/get-full-organization (the `GetWorkspacePresence` operationId) request.
+func (c *Client) GetWorkspacePresence(ctx context.Context, params *GetWorkspacePresenceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetWorkspacePresenceRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5914,11 +5677,9 @@ func (c *Client) GetOrganizationInvitation(ctx context.Context, params *GetOrgan
 	return c.Client.Do(req)
 }
 
-// GetOrganizationRole Get Organization Role
-//
-// Corresponds with GET /auth/organization/get-role (the `GetOrganizationRole` operationId).
-func (c *Client) GetOrganizationRole(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetOrganizationRoleRequest(c.Server)
+// GetWorkspaceRole performs a GET /auth/organization/get-role (the `GetWorkspaceRole` operationId) request.
+func (c *Client) GetWorkspaceRole(ctx context.Context, params *GetWorkspaceRoleParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetWorkspaceRoleRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6086,11 +5847,9 @@ func (c *Client) ListOrganizationMembers(ctx context.Context, reqEditors ...Requ
 	return c.Client.Do(req)
 }
 
-// ListOrganizationRoles List Organization Roles
-//
-// Corresponds with GET /auth/organization/list-roles (the `ListOrganizationRoles` operationId).
-func (c *Client) ListOrganizationRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationRolesRequest(c.Server)
+// ListWorkspaceRoles performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
+func (c *Client) ListWorkspaceRoles(ctx context.Context, params *ListWorkspaceRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWorkspaceRolesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6473,13 +6232,10 @@ func (c *Client) UpdateOrganizationMemberRole(ctx context.Context, body UpdateOr
 	return c.Client.Do(req)
 }
 
-// UpdateOrganizationRoleWithBody Update Organization Role
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-func (c *Client) UpdateOrganizationRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateOrganizationRoleRequestWithBody(c.Server, contentType, body)
+// UpdateWorkspaceRoleWithBody performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) UpdateWorkspaceRoleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceRoleRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6490,13 +6246,10 @@ func (c *Client) UpdateOrganizationRoleWithBody(ctx context.Context, contentType
 	return c.Client.Do(req)
 }
 
-// UpdateOrganizationRole Update Organization Role
-//
+// UpdateWorkspaceRole performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-func (c *Client) UpdateOrganizationRole(ctx context.Context, body UpdateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateOrganizationRoleRequest(c.Server, body)
+func (c *Client) UpdateWorkspaceRole(ctx context.Context, body UpdateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateWorkspaceRoleRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10166,19 +9919,19 @@ func NewCreateOrganizationRequestWithBody(server string, contentType string, bod
 	return req, nil
 }
 
-// NewCreateOrganizationRoleRequest calls the generic CreateOrganizationRole builder with application/json body
-func NewCreateOrganizationRoleRequest(server string, body CreateOrganizationRoleJSONRequestBody) (*http.Request, error) {
+// NewCreateWorkspaceRoleRequest calls the generic CreateWorkspaceRole builder with application/json body
+func NewCreateWorkspaceRoleRequest(server string, body CreateWorkspaceRoleJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewCreateOrganizationRoleRequestWithBody(server, "application/json", bodyReader)
+	return NewCreateWorkspaceRoleRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewCreateOrganizationRoleRequestWithBody constructs an http.Request for the CreateOrganizationRole method, with any body, and a specified content type
-func NewCreateOrganizationRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewCreateWorkspaceRoleRequestWithBody constructs an http.Request for the CreateWorkspaceRole method, with any body, and a specified content type
+func NewCreateWorkspaceRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10286,19 +10039,19 @@ func NewDeleteOrganizationRequestWithBody(server string, contentType string, bod
 	return req, nil
 }
 
-// NewDeleteOrganizationRoleRequest calls the generic DeleteOrganizationRole builder with application/json body
-func NewDeleteOrganizationRoleRequest(server string, body DeleteOrganizationRoleJSONRequestBody) (*http.Request, error) {
+// NewDeleteWorkspaceRoleRequest calls the generic DeleteWorkspaceRole builder with application/json body
+func NewDeleteWorkspaceRoleRequest(server string, body DeleteWorkspaceRoleJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewDeleteOrganizationRoleRequestWithBody(server, "application/json", bodyReader)
+	return NewDeleteWorkspaceRoleRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewDeleteOrganizationRoleRequestWithBody constructs an http.Request for the DeleteOrganizationRole method, with any body, and a specified content type
-func NewDeleteOrganizationRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewDeleteWorkspaceRoleRequestWithBody constructs an http.Request for the DeleteWorkspaceRole method, with any body, and a specified content type
+func NewDeleteWorkspaceRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10380,8 +10133,8 @@ func NewGetOrganizationActiveMemberRoleRequest(server string) (*http.Request, er
 	return req, nil
 }
 
-// NewGetOrganizationFullOrganizationRequest constructs an http.Request for the GetOrganizationFullOrganization method
-func NewGetOrganizationFullOrganizationRequest(server string) (*http.Request, error) {
+// NewGetWorkspacePresenceRequest constructs an http.Request for the GetWorkspacePresence method
+func NewGetWorkspacePresenceRequest(server string, params *GetWorkspacePresenceParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10397,6 +10150,29 @@ func NewGetOrganizationFullOrganizationRequest(server string) (*http.Request, er
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -10457,8 +10233,8 @@ func NewGetOrganizationInvitationRequest(server string, params *GetOrganizationI
 	return req, nil
 }
 
-// NewGetOrganizationRoleRequest constructs an http.Request for the GetOrganizationRole method
-func NewGetOrganizationRoleRequest(server string) (*http.Request, error) {
+// NewGetWorkspaceRoleRequest constructs an http.Request for the GetWorkspaceRole method
+func NewGetWorkspaceRoleRequest(server string, params *GetWorkspaceRoleParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10474,6 +10250,37 @@ func NewGetOrganizationRoleRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "roleId", params.RoleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -10685,8 +10492,8 @@ func NewListOrganizationMembersRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewListOrganizationRolesRequest constructs an http.Request for the ListOrganizationRoles method
-func NewListOrganizationRolesRequest(server string) (*http.Request, error) {
+// NewListWorkspaceRolesRequest constructs an http.Request for the ListWorkspaceRoles method
+func NewListWorkspaceRolesRequest(server string, params *ListWorkspaceRolesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10702,6 +10509,29 @@ func NewListOrganizationRolesRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -11140,19 +10970,19 @@ func NewUpdateOrganizationMemberRoleRequestWithBody(server string, contentType s
 	return req, nil
 }
 
-// NewUpdateOrganizationRoleRequest calls the generic UpdateOrganizationRole builder with application/json body
-func NewUpdateOrganizationRoleRequest(server string, body UpdateOrganizationRoleJSONRequestBody) (*http.Request, error) {
+// NewUpdateWorkspaceRoleRequest calls the generic UpdateWorkspaceRole builder with application/json body
+func NewUpdateWorkspaceRoleRequest(server string, body UpdateWorkspaceRoleJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateOrganizationRoleRequestWithBody(server, "application/json", bodyReader)
+	return NewUpdateWorkspaceRoleRequestWithBody(server, "application/json", bodyReader)
 }
 
-// NewUpdateOrganizationRoleRequestWithBody constructs an http.Request for the UpdateOrganizationRole method, with any body, and a specified content type
-func NewUpdateOrganizationRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpdateWorkspaceRoleRequestWithBody constructs an http.Request for the UpdateWorkspaceRole method, with any body, and a specified content type
+func NewUpdateWorkspaceRoleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -15931,19 +15761,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/organization/create (the `CreateOrganization` operationId).
 	CreateOrganizationWithResponse(ctx context.Context, body CreateOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationResponse, error)
 
-	// CreateOrganizationRoleWithBodyWithResponse Create Organization Role
+	// CreateWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
 	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-	CreateOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationRoleResponse, error)
+	// Returns a wrapper object for the known response body format(s).
+	CreateWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceRoleResponse, error)
 
-	// CreateOrganizationRoleWithResponse Create Organization Role
-	//
+	// CreateWorkspaceRoleWithResponse performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-	CreateOrganizationRoleWithResponse(ctx context.Context, body CreateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationRoleResponse, error)
+	CreateWorkspaceRoleWithResponse(ctx context.Context, body CreateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceRoleResponse, error)
 
 	// CreateOrganizationTeamWithBodyWithResponse Create Organization Team
 	//
@@ -15981,19 +15807,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/organization/delete (the `DeleteOrganization` operationId).
 	DeleteOrganizationWithResponse(ctx context.Context, body DeleteOrganizationJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteOrganizationResponse, error)
 
-	// DeleteOrganizationRoleWithBodyWithResponse Delete Organization Role
+	// DeleteWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
 	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-	DeleteOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteOrganizationRoleResponse, error)
+	// Returns a wrapper object for the known response body format(s).
+	DeleteWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteWorkspaceRoleResponse, error)
 
-	// DeleteOrganizationRoleWithResponse Delete Organization Role
-	//
+	// DeleteWorkspaceRoleWithResponse performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-	DeleteOrganizationRoleWithResponse(ctx context.Context, body DeleteOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteOrganizationRoleResponse, error)
+	DeleteWorkspaceRoleWithResponse(ctx context.Context, body DeleteWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteWorkspaceRoleResponse, error)
 
 	// GetOrganizationActiveMemberWithResponse Get Organization Active Member
 	//
@@ -16011,14 +15833,10 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /auth/organization/get-active-member-role (the `GetOrganizationActiveMemberRole` operationId).
 	GetOrganizationActiveMemberRoleWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOrganizationActiveMemberRoleResponse, error)
 
-	// GetOrganizationFullOrganizationWithResponse Get Organization Full Organization
-	//
-	// Get the full organization.
+	// GetWorkspacePresenceWithResponse performs a GET /auth/organization/get-full-organization (the `GetWorkspacePresence` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /auth/organization/get-full-organization (the `GetOrganizationFullOrganization` operationId).
-	GetOrganizationFullOrganizationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOrganizationFullOrganizationResponse, error)
+	GetWorkspacePresenceWithResponse(ctx context.Context, params *GetWorkspacePresenceParams, reqEditors ...RequestEditorFn) (*GetWorkspacePresenceResponse, error)
 
 	// GetOrganizationInvitationWithResponse Get Organization Invitation
 	//
@@ -16029,12 +15847,10 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /auth/organization/get-invitation (the `GetOrganizationInvitation` operationId).
 	GetOrganizationInvitationWithResponse(ctx context.Context, params *GetOrganizationInvitationParams, reqEditors ...RequestEditorFn) (*GetOrganizationInvitationResponse, error)
 
-	// GetOrganizationRoleWithResponse Get Organization Role
+	// GetWorkspaceRoleWithResponse performs a GET /auth/organization/get-role (the `GetWorkspaceRole` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /auth/organization/get-role (the `GetOrganizationRole` operationId).
-	GetOrganizationRoleWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOrganizationRoleResponse, error)
+	GetWorkspaceRoleWithResponse(ctx context.Context, params *GetWorkspaceRoleParams, reqEditors ...RequestEditorFn) (*GetWorkspaceRoleResponse, error)
 
 	// HasOrganizationPermissionWithBodyWithResponse Check Organization Permission
 	//
@@ -16109,12 +15925,10 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
 	ListOrganizationMembersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationMembersResponse, error)
 
-	// ListOrganizationRolesWithResponse List Organization Roles
+	// ListWorkspaceRolesWithResponse performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /auth/organization/list-roles (the `ListOrganizationRoles` operationId).
-	ListOrganizationRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationRolesResponse, error)
+	ListWorkspaceRolesWithResponse(ctx context.Context, params *ListWorkspaceRolesParams, reqEditors ...RequestEditorFn) (*ListWorkspaceRolesResponse, error)
 
 	// ListOrganizationTeamMembersWithResponse List Organization Team Members
 	//
@@ -16296,19 +16110,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/organization/update-member-role (the `UpdateOrganizationMemberRole` operationId).
 	UpdateOrganizationMemberRoleWithResponse(ctx context.Context, body UpdateOrganizationMemberRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationMemberRoleResponse, error)
 
-	// UpdateOrganizationRoleWithBodyWithResponse Update Organization Role
+	// UpdateWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request,
+	// with any type of body and a specified content type.
 	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-	UpdateOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOrganizationRoleResponse, error)
+	// Returns a wrapper object for the known response body format(s).
+	UpdateWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceRoleResponse, error)
 
-	// UpdateOrganizationRoleWithResponse Update Organization Role
-	//
+	// UpdateWorkspaceRoleWithResponse performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-	UpdateOrganizationRoleWithResponse(ctx context.Context, body UpdateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationRoleResponse, error)
+	UpdateWorkspaceRoleWithResponse(ctx context.Context, body UpdateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceRoleResponse, error)
 
 	// UpdateOrganizationTeamWithBodyWithResponse Update Organization Team
 	//
@@ -18496,18 +18306,25 @@ func (r CreateOrganizationResponse) ContentType() string {
 	return ""
 }
 
-type CreateOrganizationRoleResponse struct {
+type CreateWorkspaceRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WorkspaceRoleResult
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateWorkspaceRoleResponse) GetJSON200() *WorkspaceRoleResult {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r CreateOrganizationRoleResponse) GetBody() []byte {
+func (r CreateWorkspaceRoleResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateOrganizationRoleResponse) Status() string {
+func (r CreateWorkspaceRoleResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -18515,7 +18332,7 @@ func (r CreateOrganizationRoleResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateOrganizationRoleResponse) StatusCode() int {
+func (r CreateWorkspaceRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -18523,7 +18340,7 @@ func (r CreateOrganizationRoleResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateOrganizationRoleResponse) ContentType() string {
+func (r CreateWorkspaceRoleResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -18642,18 +18459,25 @@ func (r DeleteOrganizationResponse) ContentType() string {
 	return ""
 }
 
-type DeleteOrganizationRoleResponse struct {
+type DeleteWorkspaceRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WorkspaceRoleSuccess
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteWorkspaceRoleResponse) GetJSON200() *WorkspaceRoleSuccess {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r DeleteOrganizationRoleResponse) GetBody() []byte {
+func (r DeleteWorkspaceRoleResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r DeleteOrganizationRoleResponse) Status() string {
+func (r DeleteWorkspaceRoleResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -18661,7 +18485,7 @@ func (r DeleteOrganizationRoleResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DeleteOrganizationRoleResponse) StatusCode() int {
+func (r DeleteWorkspaceRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -18669,7 +18493,7 @@ func (r DeleteOrganizationRoleResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteOrganizationRoleResponse) ContentType() string {
+func (r DeleteWorkspaceRoleResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -18761,25 +18585,29 @@ func (r GetOrganizationActiveMemberRoleResponse) ContentType() string {
 	return ""
 }
 
-type GetOrganizationFullOrganizationResponse struct {
+type GetWorkspacePresenceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *interface{}
+	JSON200 *struct {
+		Id string `json:"id"`
+	}
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetOrganizationFullOrganizationResponse) GetJSON200() *interface{} {
+func (r GetWorkspacePresenceResponse) GetJSON200() *struct {
+	Id string `json:"id"`
+} {
 	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r GetOrganizationFullOrganizationResponse) GetBody() []byte {
+func (r GetWorkspacePresenceResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r GetOrganizationFullOrganizationResponse) Status() string {
+func (r GetWorkspacePresenceResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -18787,7 +18615,7 @@ func (r GetOrganizationFullOrganizationResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetOrganizationFullOrganizationResponse) StatusCode() int {
+func (r GetWorkspacePresenceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -18795,7 +18623,7 @@ func (r GetOrganizationFullOrganizationResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetOrganizationFullOrganizationResponse) ContentType() string {
+func (r GetWorkspacePresenceResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -18865,18 +18693,25 @@ func (r GetOrganizationInvitationResponse) ContentType() string {
 	return ""
 }
 
-type GetOrganizationRoleResponse struct {
+type GetWorkspaceRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WorkspaceRole
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetWorkspaceRoleResponse) GetJSON200() *WorkspaceRole {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r GetOrganizationRoleResponse) GetBody() []byte {
+func (r GetWorkspaceRoleResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r GetOrganizationRoleResponse) Status() string {
+func (r GetWorkspaceRoleResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -18884,7 +18719,7 @@ func (r GetOrganizationRoleResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetOrganizationRoleResponse) StatusCode() int {
+func (r GetWorkspaceRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -18892,7 +18727,7 @@ func (r GetOrganizationRoleResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetOrganizationRoleResponse) ContentType() string {
+func (r GetWorkspaceRoleResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19148,18 +18983,25 @@ func (r ListOrganizationMembersResponse) ContentType() string {
 	return ""
 }
 
-type ListOrganizationRolesResponse struct {
+type ListWorkspaceRolesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]WorkspaceRole
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListWorkspaceRolesResponse) GetJSON200() *[]WorkspaceRole {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r ListOrganizationRolesResponse) GetBody() []byte {
+func (r ListWorkspaceRolesResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r ListOrganizationRolesResponse) Status() string {
+func (r ListWorkspaceRolesResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -19167,7 +19009,7 @@ func (r ListOrganizationRolesResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ListOrganizationRolesResponse) StatusCode() int {
+func (r ListWorkspaceRolesResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -19175,7 +19017,7 @@ func (r ListOrganizationRolesResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListOrganizationRolesResponse) ContentType() string {
+func (r ListWorkspaceRolesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19804,18 +19646,25 @@ func (r UpdateOrganizationMemberRoleResponse) ContentType() string {
 	return ""
 }
 
-type UpdateOrganizationRoleResponse struct {
+type UpdateWorkspaceRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WorkspaceRoleResult
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateWorkspaceRoleResponse) GetJSON200() *WorkspaceRoleResult {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
-func (r UpdateOrganizationRoleResponse) GetBody() []byte {
+func (r UpdateWorkspaceRoleResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r UpdateOrganizationRoleResponse) Status() string {
+func (r UpdateWorkspaceRoleResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -19823,7 +19672,7 @@ func (r UpdateOrganizationRoleResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpdateOrganizationRoleResponse) StatusCode() int {
+func (r UpdateWorkspaceRoleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -19831,7 +19680,7 @@ func (r UpdateOrganizationRoleResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r UpdateOrganizationRoleResponse) ContentType() string {
+func (r UpdateWorkspaceRoleResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -24789,30 +24638,26 @@ func (c *ClientWithResponses) CreateOrganizationWithResponse(ctx context.Context
 	return ParseCreateOrganizationResponse(rsp)
 }
 
-// CreateOrganizationRoleWithBodyWithResponse Create Organization Role
+// CreateWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
 //
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-func (c *ClientWithResponses) CreateOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrganizationRoleResponse, error) {
-	rsp, err := c.CreateOrganizationRoleWithBody(ctx, contentType, body, reqEditors...)
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateWorkspaceRoleResponse, error) {
+	rsp, err := c.CreateWorkspaceRoleWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateOrganizationRoleResponse(rsp)
+	return ParseCreateWorkspaceRoleResponse(rsp)
 }
 
-// CreateOrganizationRoleWithResponse Create Organization Role
-//
+// CreateWorkspaceRoleWithResponse performs a POST /auth/organization/create-role (the `CreateWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/create-role (the `CreateOrganizationRole` operationId).
-func (c *ClientWithResponses) CreateOrganizationRoleWithResponse(ctx context.Context, body CreateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrganizationRoleResponse, error) {
-	rsp, err := c.CreateOrganizationRole(ctx, body, reqEditors...)
+func (c *ClientWithResponses) CreateWorkspaceRoleWithResponse(ctx context.Context, body CreateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateWorkspaceRoleResponse, error) {
+	rsp, err := c.CreateWorkspaceRole(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCreateOrganizationRoleResponse(rsp)
+	return ParseCreateWorkspaceRoleResponse(rsp)
 }
 
 // CreateOrganizationTeamWithBodyWithResponse Create Organization Team
@@ -24875,30 +24720,26 @@ func (c *ClientWithResponses) DeleteOrganizationWithResponse(ctx context.Context
 	return ParseDeleteOrganizationResponse(rsp)
 }
 
-// DeleteOrganizationRoleWithBodyWithResponse Delete Organization Role
+// DeleteWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
 //
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-func (c *ClientWithResponses) DeleteOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteOrganizationRoleResponse, error) {
-	rsp, err := c.DeleteOrganizationRoleWithBody(ctx, contentType, body, reqEditors...)
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DeleteWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteWorkspaceRoleResponse, error) {
+	rsp, err := c.DeleteWorkspaceRoleWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteOrganizationRoleResponse(rsp)
+	return ParseDeleteWorkspaceRoleResponse(rsp)
 }
 
-// DeleteOrganizationRoleWithResponse Delete Organization Role
-//
+// DeleteWorkspaceRoleWithResponse performs a POST /auth/organization/delete-role (the `DeleteWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/delete-role (the `DeleteOrganizationRole` operationId).
-func (c *ClientWithResponses) DeleteOrganizationRoleWithResponse(ctx context.Context, body DeleteOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteOrganizationRoleResponse, error) {
-	rsp, err := c.DeleteOrganizationRole(ctx, body, reqEditors...)
+func (c *ClientWithResponses) DeleteWorkspaceRoleWithResponse(ctx context.Context, body DeleteWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteWorkspaceRoleResponse, error) {
+	rsp, err := c.DeleteWorkspaceRole(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDeleteOrganizationRoleResponse(rsp)
+	return ParseDeleteWorkspaceRoleResponse(rsp)
 }
 
 // GetOrganizationActiveMemberWithResponse Get Organization Active Member
@@ -24929,19 +24770,15 @@ func (c *ClientWithResponses) GetOrganizationActiveMemberRoleWithResponse(ctx co
 	return ParseGetOrganizationActiveMemberRoleResponse(rsp)
 }
 
-// GetOrganizationFullOrganizationWithResponse Get Organization Full Organization
-//
-// Get the full organization.
+// GetWorkspacePresenceWithResponse performs a GET /auth/organization/get-full-organization (the `GetWorkspacePresence` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /auth/organization/get-full-organization (the `GetOrganizationFullOrganization` operationId).
-func (c *ClientWithResponses) GetOrganizationFullOrganizationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOrganizationFullOrganizationResponse, error) {
-	rsp, err := c.GetOrganizationFullOrganization(ctx, reqEditors...)
+func (c *ClientWithResponses) GetWorkspacePresenceWithResponse(ctx context.Context, params *GetWorkspacePresenceParams, reqEditors ...RequestEditorFn) (*GetWorkspacePresenceResponse, error) {
+	rsp, err := c.GetWorkspacePresence(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetOrganizationFullOrganizationResponse(rsp)
+	return ParseGetWorkspacePresenceResponse(rsp)
 }
 
 // GetOrganizationInvitationWithResponse Get Organization Invitation
@@ -24959,17 +24796,15 @@ func (c *ClientWithResponses) GetOrganizationInvitationWithResponse(ctx context.
 	return ParseGetOrganizationInvitationResponse(rsp)
 }
 
-// GetOrganizationRoleWithResponse Get Organization Role
+// GetWorkspaceRoleWithResponse performs a GET /auth/organization/get-role (the `GetWorkspaceRole` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /auth/organization/get-role (the `GetOrganizationRole` operationId).
-func (c *ClientWithResponses) GetOrganizationRoleWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOrganizationRoleResponse, error) {
-	rsp, err := c.GetOrganizationRole(ctx, reqEditors...)
+func (c *ClientWithResponses) GetWorkspaceRoleWithResponse(ctx context.Context, params *GetWorkspaceRoleParams, reqEditors ...RequestEditorFn) (*GetWorkspaceRoleResponse, error) {
+	rsp, err := c.GetWorkspaceRole(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetOrganizationRoleResponse(rsp)
+	return ParseGetWorkspaceRoleResponse(rsp)
 }
 
 // HasOrganizationPermissionWithBodyWithResponse Check Organization Permission
@@ -25099,17 +24934,15 @@ func (c *ClientWithResponses) ListOrganizationMembersWithResponse(ctx context.Co
 	return ParseListOrganizationMembersResponse(rsp)
 }
 
-// ListOrganizationRolesWithResponse List Organization Roles
+// ListWorkspaceRolesWithResponse performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /auth/organization/list-roles (the `ListOrganizationRoles` operationId).
-func (c *ClientWithResponses) ListOrganizationRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationRolesResponse, error) {
-	rsp, err := c.ListOrganizationRoles(ctx, reqEditors...)
+func (c *ClientWithResponses) ListWorkspaceRolesWithResponse(ctx context.Context, params *ListWorkspaceRolesParams, reqEditors ...RequestEditorFn) (*ListWorkspaceRolesResponse, error) {
+	rsp, err := c.ListWorkspaceRoles(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseListOrganizationRolesResponse(rsp)
+	return ParseListWorkspaceRolesResponse(rsp)
 }
 
 // ListOrganizationTeamMembersWithResponse List Organization Team Members
@@ -25412,30 +25245,26 @@ func (c *ClientWithResponses) UpdateOrganizationMemberRoleWithResponse(ctx conte
 	return ParseUpdateOrganizationMemberRoleResponse(rsp)
 }
 
-// UpdateOrganizationRoleWithBodyWithResponse Update Organization Role
+// UpdateWorkspaceRoleWithBodyWithResponse performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request,
+// with any type of body and a specified content type.
 //
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-func (c *ClientWithResponses) UpdateOrganizationRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOrganizationRoleResponse, error) {
-	rsp, err := c.UpdateOrganizationRoleWithBody(ctx, contentType, body, reqEditors...)
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UpdateWorkspaceRoleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateWorkspaceRoleResponse, error) {
+	rsp, err := c.UpdateWorkspaceRoleWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateOrganizationRoleResponse(rsp)
+	return ParseUpdateWorkspaceRoleResponse(rsp)
 }
 
-// UpdateOrganizationRoleWithResponse Update Organization Role
-//
+// UpdateWorkspaceRoleWithResponse performs a POST /auth/organization/update-role (the `UpdateWorkspaceRole` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /auth/organization/update-role (the `UpdateOrganizationRole` operationId).
-func (c *ClientWithResponses) UpdateOrganizationRoleWithResponse(ctx context.Context, body UpdateOrganizationRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOrganizationRoleResponse, error) {
-	rsp, err := c.UpdateOrganizationRole(ctx, body, reqEditors...)
+func (c *ClientWithResponses) UpdateWorkspaceRoleWithResponse(ctx context.Context, body UpdateWorkspaceRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWorkspaceRoleResponse, error) {
+	rsp, err := c.UpdateWorkspaceRole(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateOrganizationRoleResponse(rsp)
+	return ParseUpdateWorkspaceRoleResponse(rsp)
 }
 
 // UpdateOrganizationTeamWithBodyWithResponse Update Organization Team
@@ -28301,17 +28130,27 @@ func ParseCreateOrganizationResponse(rsp *http.Response) (*CreateOrganizationRes
 	return response, nil
 }
 
-// ParseCreateOrganizationRoleResponse parses an HTTP response from a CreateOrganizationRoleWithResponse call
-func ParseCreateOrganizationRoleResponse(rsp *http.Response) (*CreateOrganizationRoleResponse, error) {
+// ParseCreateWorkspaceRoleResponse parses an HTTP response from a CreateWorkspaceRoleWithResponse call
+func ParseCreateWorkspaceRoleResponse(rsp *http.Response) (*CreateWorkspaceRoleResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CreateOrganizationRoleResponse{
+	response := &CreateWorkspaceRoleResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspaceRoleResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -28390,17 +28229,27 @@ func ParseDeleteOrganizationResponse(rsp *http.Response) (*DeleteOrganizationRes
 	return response, nil
 }
 
-// ParseDeleteOrganizationRoleResponse parses an HTTP response from a DeleteOrganizationRoleWithResponse call
-func ParseDeleteOrganizationRoleResponse(rsp *http.Response) (*DeleteOrganizationRoleResponse, error) {
+// ParseDeleteWorkspaceRoleResponse parses an HTTP response from a DeleteWorkspaceRoleWithResponse call
+func ParseDeleteWorkspaceRoleResponse(rsp *http.Response) (*DeleteWorkspaceRoleResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteOrganizationRoleResponse{
+	response := &DeleteWorkspaceRoleResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspaceRoleSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -28456,29 +28305,28 @@ func ParseGetOrganizationActiveMemberRoleResponse(rsp *http.Response) (*GetOrgan
 	return response, nil
 }
 
-// ParseGetOrganizationFullOrganizationResponse parses an HTTP response from a GetOrganizationFullOrganizationWithResponse call
-func ParseGetOrganizationFullOrganizationResponse(rsp *http.Response) (*GetOrganizationFullOrganizationResponse, error) {
+// ParseGetWorkspacePresenceResponse parses an HTTP response from a GetWorkspacePresenceWithResponse call
+func ParseGetWorkspacePresenceResponse(rsp *http.Response) (*GetWorkspacePresenceResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetOrganizationFullOrganizationResponse{
+	response := &GetWorkspacePresenceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
+		var dest struct {
+			Id string `json:"id"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
-
-	case rsp.StatusCode == 401:
-		break // No content-type
 
 	}
 
@@ -28525,17 +28373,27 @@ func ParseGetOrganizationInvitationResponse(rsp *http.Response) (*GetOrganizatio
 	return response, nil
 }
 
-// ParseGetOrganizationRoleResponse parses an HTTP response from a GetOrganizationRoleWithResponse call
-func ParseGetOrganizationRoleResponse(rsp *http.Response) (*GetOrganizationRoleResponse, error) {
+// ParseGetWorkspaceRoleResponse parses an HTTP response from a GetWorkspaceRoleWithResponse call
+func ParseGetWorkspaceRoleResponse(rsp *http.Response) (*GetWorkspaceRoleResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetOrganizationRoleResponse{
+	response := &GetWorkspaceRoleResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspaceRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -28688,17 +28546,27 @@ func ParseListOrganizationMembersResponse(rsp *http.Response) (*ListOrganization
 	return response, nil
 }
 
-// ParseListOrganizationRolesResponse parses an HTTP response from a ListOrganizationRolesWithResponse call
-func ParseListOrganizationRolesResponse(rsp *http.Response) (*ListOrganizationRolesResponse, error) {
+// ParseListWorkspaceRolesResponse parses an HTTP response from a ListWorkspaceRolesWithResponse call
+func ParseListWorkspaceRolesResponse(rsp *http.Response) (*ListWorkspaceRolesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ListOrganizationRolesResponse{
+	response := &ListWorkspaceRolesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []WorkspaceRole
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
@@ -29117,17 +28985,27 @@ func ParseUpdateOrganizationMemberRoleResponse(rsp *http.Response) (*UpdateOrgan
 	return response, nil
 }
 
-// ParseUpdateOrganizationRoleResponse parses an HTTP response from a UpdateOrganizationRoleWithResponse call
-func ParseUpdateOrganizationRoleResponse(rsp *http.Response) (*UpdateOrganizationRoleResponse, error) {
+// ParseUpdateWorkspaceRoleResponse parses an HTTP response from a UpdateWorkspaceRoleWithResponse call
+func ParseUpdateWorkspaceRoleResponse(rsp *http.Response) (*UpdateWorkspaceRoleResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpdateOrganizationRoleResponse{
+	response := &UpdateWorkspaceRoleResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspaceRoleResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil

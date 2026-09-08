@@ -117,6 +117,7 @@ func (p *KaneoProvider) Resources(context.Context) []func() resource.Resource {
 		newLabelResource,
 		newTaskLabelResource,
 		newUserResource,
+		newWorkspaceRoleResource,
 	}
 }
 

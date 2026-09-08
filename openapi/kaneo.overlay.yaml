@@ -229,3 +229,213 @@ actions:
                     required: [status]
                     properties:
                       status: {type: boolean}
+
+  - target: $.components.schemas
+    description: Dynamic role wire responses from Better Auth 1.6.25 crud-access-control.mjs. Permissions are objects, not serialized JSON.
+    update:
+      WorkspaceRole:
+        type: object
+        required:
+        - id
+        - organizationId
+        - role
+        - permission
+        properties:
+          id:
+            type: string
+          organizationId:
+            type: string
+          role:
+            type: string
+          permission:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+      WorkspaceRoleResult:
+        type: object
+        required:
+        - success
+        - roleData
+        properties:
+          success:
+            type: boolean
+          roleData:
+            "$ref": "#/components/schemas/WorkspaceRole"
+      WorkspaceRoleUpdate:
+        type: object
+        required: []
+        properties:
+          permission:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+          roleName:
+            type: string
+      WorkspaceRoleSuccess:
+        type: object
+        required:
+        - success
+        properties:
+          success:
+            type: boolean
+  - target: $.paths['/auth/organization/create-role']
+    remove: true
+  - target: $.paths['/auth/organization/get-role']
+    remove: true
+  - target: $.paths['/auth/organization/update-role']
+    remove: true
+  - target: $.paths['/auth/organization/delete-role']
+    remove: true
+  - target: $.paths['/auth/organization/list-roles']
+    remove: true
+  - target: $.paths['/auth/organization/get-full-organization']
+    remove: true
+  - target: $.paths
+    description: Explicit workspace queries and ID-based role CRUD. Full organization returns ORGANIZATION_NOT_FOUND before membership checks, unlike the membership-only list.
+    update:
+      "/auth/organization/create-role":
+        post:
+          operationId: createWorkspaceRole
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required:
+                  - organizationId
+                  - role
+                  - permission
+                  properties:
+                    organizationId:
+                      type: string
+                    role:
+                      type: string
+                    permission:
+                      type: object
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: string
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    "$ref": "#/components/schemas/WorkspaceRoleResult"
+      "/auth/organization/get-role":
+        get:
+          operationId: getWorkspaceRole
+          parameters:
+          - name: organizationId
+            in: query
+            required: true
+            schema:
+              type: string
+          - name: roleId
+            in: query
+            required: true
+            schema:
+              type: string
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    "$ref": "#/components/schemas/WorkspaceRole"
+      "/auth/organization/update-role":
+        post:
+          operationId: updateWorkspaceRole
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required:
+                  - organizationId
+                  - roleId
+                  - data
+                  properties:
+                    organizationId:
+                      type: string
+                    roleId:
+                      type: string
+                    data:
+                      "$ref": "#/components/schemas/WorkspaceRoleUpdate"
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    "$ref": "#/components/schemas/WorkspaceRoleResult"
+      "/auth/organization/delete-role":
+        post:
+          operationId: deleteWorkspaceRole
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required:
+                  - organizationId
+                  - roleId
+                  properties:
+                    organizationId:
+                      type: string
+                    roleId:
+                      type: string
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    "$ref": "#/components/schemas/WorkspaceRoleSuccess"
+      "/auth/organization/list-roles":
+        get:
+          operationId: listWorkspaceRoles
+          parameters:
+          - name: organizationId
+            in: query
+            required: true
+            schema:
+              type: string
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/WorkspaceRole"
+      "/auth/organization/get-full-organization":
+        get:
+          operationId: getWorkspacePresence
+          parameters:
+          - name: organizationId
+            in: query
+            required: true
+            schema:
+              type: string
+          responses:
+            '200':
+              description: Better Auth 1.6.25 response
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    required:
+                    - id
+                    properties:
+                      id:
+                        type: string
