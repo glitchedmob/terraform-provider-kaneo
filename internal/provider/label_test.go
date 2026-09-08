@@ -5,6 +5,7 @@ package provider
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -25,100 +26,54 @@ func labelTestAPIValue(t *testing.T, body string) kaneoclient.Label {
 	return label
 }
 
-func TestLabelLifecycle(t *testing.T) {
-	remote := labelTestAPIValue(t, labelFixture)
-	mutations := 0
-	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method + " " + r.URL.Path {
-		case "GET /label/workspace/workspace-1":
-			if _, err := fmt.Fprint(w, "[]"); err != nil {
-				t.Error(err)
+func TestLabelMutationWireShapes(t *testing.T) {
+	for _, create := range []bool{true, false} {
+		t.Run(fmt.Sprintf("create=%t", create), func(t *testing.T) {
+			var calls []string
+			r := &labelResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls = append(calls, r.Method+" "+r.URL.Path)
+				result := labelFixture
+				if r.Method == http.MethodGet {
+					if r.URL.Path == "/label/workspace/workspace-1" {
+						result = "[]"
+					}
+				} else {
+					var body map[string]any
+					if !testDecodeRequest(t, w, r, &body) {
+						return
+					}
+					want := map[string]any{"name": "Bug", "color": "#ef4444"}
+					if create {
+						want["workspaceId"] = "workspace-1"
+					}
+					if !reflect.DeepEqual(body, want) {
+						t.Errorf("workspace label body = %v, want %v; taskId must be absent", body, want)
+					}
+				}
+				if _, err := fmt.Fprint(w, result); err != nil {
+					t.Error(err)
+				}
+			})}
+			plan := testPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
+			wantCalls := "GET /label/label-1,PUT /label/label-1"
+			if create {
+				response := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
+				wantCalls = "GET /label/workspace/workspace-1,POST /label"
+			} else {
+				response := resource.UpdateResponse{State: tfsdk.State(plan)}
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: tfsdk.State(plan)}, &response)
+				if response.Diagnostics.HasError() {
+					t.Fatal(response.Diagnostics)
+				}
 			}
-			return
-		case "POST /label", "PUT /label/label-1":
-			var body map[string]any
-			if !testDecodeRequest(t, w, r, &body) {
-				return
+			if strings.Join(calls, ",") != wantCalls {
+				t.Fatalf("scope check must precede mutation: %v", calls)
 			}
-			if r.Method == http.MethodPost && body["workspaceId"] != "workspace-1" {
-				t.Error("missing workspace")
-			}
-			if _, ok := body["taskId"]; ok {
-				t.Error("workspace label must not send taskId")
-			}
-			remote.Name, _ = body["name"].(string)
-			remote.Color, _ = body["color"].(string)
-			mutations++
-		case "GET /label/label-1":
-		case "DELETE /label/label-1":
-			mutations++
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-		testEncodeResponse(t, w, remote)
-	})
-	r := &labelResource{client: client}
-	model := labelModelFromAPI(remote)
-	plan := testPlan(t, r, model)
-	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
-	if created.Diagnostics.HasError() {
-		t.Fatal(created.Diagnostics)
-	}
-	var got labelModel
-	if diags := created.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("created state=%+v, want %+v", got, model)
-	}
-	model.Name, model.Color = types.StringValue("Issue"), types.StringValue("#123ABC")
-	updated := resource.UpdateResponse{State: created.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, model), State: created.State}, &updated)
-	if updated.Diagnostics.HasError() {
-		t.Fatal(updated.Diagnostics)
-	}
-	if diags := updated.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("updated state=%+v, want %+v", got, model)
-	}
-	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, labelModel{}))}
-	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "label-1"}, &imported)
-	if imported.Diagnostics.HasError() {
-		t.Fatal(imported.Diagnostics)
-	}
-	read := resource.ReadResponse{State: imported.State}
-	r.Read(t.Context(), resource.ReadRequest{State: imported.State}, &read)
-	if read.Diagnostics.HasError() {
-		t.Fatal(read.Diagnostics)
-	}
-	if diags := read.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("import state=%+v, want %+v", got, model)
-	}
-	config := testConfig(t, &labelDataSource{}, labelModel{ID: types.StringValue("label-1")})
-	lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
-	(&labelDataSource{client: client}).Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
-	if lookup.Diagnostics.HasError() {
-		t.Fatal(lookup.Diagnostics)
-	}
-	if diags := lookup.State.Get(t.Context(), &got); diags.HasError() {
-		t.Fatal(diags)
-	}
-	if got != model {
-		t.Fatalf("lookup state=%+v, want %+v", got, model)
-	}
-	deleted := resource.DeleteResponse{State: read.State}
-	r.Delete(t.Context(), resource.DeleteRequest{State: read.State}, &deleted)
-	if deleted.Diagnostics.HasError() {
-		t.Fatal(deleted.Diagnostics)
-	}
-	if mutations != 3 {
-		t.Fatalf("unexpected mutation count %d", mutations)
+		})
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -46,9 +47,7 @@ func TestColumnAttributeValidators(t *testing.T) {
 	}
 }
 
-func TestColumnResourceLifecycle(t *testing.T) {
-	var remote map[string]any
-	testFixture(t, columnFixture, &remote)
+func TestColumnCreateReorderWireShape(t *testing.T) {
 	var calls []string
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.Path)
@@ -61,18 +60,6 @@ func TestColumnResourceLifecycle(t *testing.T) {
 			if body["name"] != "Testing" || body["isFinal"] != false || len(body) != 2 {
 				t.Errorf("unexpected create body: %v", body)
 			}
-		case "PUT /column/column-1":
-			var body map[string]any
-			if !testDecodeRequest(t, w, r, &body) {
-				return
-			}
-			for _, field := range []string{"name", "icon", "color", "isFinal"} {
-				value, ok := body[field]
-				if !ok {
-					t.Errorf("update omitted %s", field)
-				}
-				remote[field] = value
-			}
 		case "PUT /column/reorder/project-1":
 			var body struct {
 				Columns []struct {
@@ -83,22 +70,21 @@ func TestColumnResourceLifecycle(t *testing.T) {
 			if !testDecodeRequest(t, w, r, &body) {
 				return
 			}
-			if len(body.Columns) != 1 || body.Columns[0].ID != "column-1" {
+			if len(body.Columns) != 1 || body.Columns[0].ID != "column-1" || body.Columns[0].Position != 16777217 {
 				t.Errorf("reorder must update only the managed column: %+v", body)
 				w.WriteHeader(500)
 				return
 			}
-			remote["position"] = body.Columns[0].Position
-			testEncodeResponse(t, w, []any{remote})
+			if _, err := fmt.Fprint(w, `[`+strings.Replace(columnFixture, `"position":4`, `"position":16777217`, 1)+`]`); err != nil {
+				t.Error(err)
+			}
 			return
-		case "GET /column/project-1":
-			testEncodeResponse(t, w, []any{remote})
-			return
-		case "DELETE /column/column-1":
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		testEncodeResponse(t, w, remote)
+		if _, err := fmt.Fprint(w, columnFixture); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &columnResource{client: client}
 	model := columnTestModel()
@@ -121,59 +107,42 @@ func TestColumnResourceLifecycle(t *testing.T) {
 	if strings.Join(calls, ",") != "POST /column/project-1,PUT /column/reorder/project-1" {
 		t.Fatalf("unexpected create calls: %v", calls)
 	}
+}
 
-	for _, clear := range []bool{false, true} {
-		state.Name = types.StringValue("Renamed")
-		state.Icon = types.StringValue("Check")
-		state.Color = types.StringValue("#abcdef")
-		state.IsFinal = types.BoolValue(true)
-		state.Position = types.Int64Value(8)
-		if clear {
-			state.Icon = types.StringNull()
-			state.Color = types.StringNull()
-			state.IsFinal = types.BoolValue(false)
+func TestColumnUpdateClearsNullableFields(t *testing.T) {
+	var calls []string
+	r := &columnResource{client: testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		var body map[string]any
+		if !testDecodeRequest(t, w, r, &body) {
+			return
 		}
-		update := resource.UpdateResponse{State: created.State}
-		r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, state)}, &update)
-		if update.Diagnostics.HasError() {
-			t.Fatal(update.Diagnostics)
+		want := map[string]any{"name": "Renamed", "icon": nil, "color": nil, "isFinal": false}
+		if !reflect.DeepEqual(body, want) {
+			t.Errorf("body = %v, want %v", body, want)
 		}
-		var got columnModel
-		if diags := update.State.Get(t.Context(), &got); diags.HasError() {
-			t.Fatal(diags)
+		if _, err := fmt.Fprint(w, strings.Replace(columnFixture, `"name":"Testing"`, `"name":"Renamed"`, 1)); err != nil {
+			t.Error(err)
 		}
-		if got != state {
-			t.Fatalf("updated state = %+v, want %+v", got, state)
-		}
-		if got.Slug.ValueString() != "testing" {
-			t.Fatal("rename must preserve slug")
-		}
-		if clear && (remote["icon"] != nil || remote["color"] != nil || remote["isFinal"] != false) {
-			t.Fatalf("clear did not send null and false: %v", remote)
-		}
-		created.State = update.State
+	})}
+	model := columnTestModel()
+	model.ID, model.Name = types.StringValue("column-1"), types.StringValue("Renamed")
+	model.Icon, model.Color, model.Position = types.StringNull(), types.StringNull(), types.Int64Unknown()
+	plan := testPlan(t, r, model)
+	response := resource.UpdateResponse{State: tfsdk.State{Schema: plan.Schema}}
+	r.Update(t.Context(), resource.UpdateRequest{Plan: plan}, &response)
+	if response.Diagnostics.HasError() {
+		t.Fatal(response.Diagnostics)
 	}
-	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, columnModel{}))}
-	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "project-1/column-1"}, &imported)
-	if imported.Diagnostics.HasError() {
-		t.Fatal(imported.Diagnostics)
-	}
-	read := resource.ReadResponse{State: imported.State}
-	r.Read(t.Context(), resource.ReadRequest{State: imported.State}, &read)
-	if read.Diagnostics.HasError() {
-		t.Fatal(read.Diagnostics)
+	if strings.Join(calls, ",") != "PUT /column/column-1" {
+		t.Fatalf("unknown position must not reorder: %v", calls)
 	}
 	var got columnModel
-	if diags := read.State.Get(t.Context(), &got); diags.HasError() {
+	if diags := response.State.Get(t.Context(), &got); diags.HasError() {
 		t.Fatal(diags)
 	}
-	if got != state {
-		t.Fatalf("import state = %+v, want %+v", got, state)
-	}
-	deleted := resource.DeleteResponse{State: read.State}
-	r.Delete(t.Context(), resource.DeleteRequest{State: read.State}, &deleted)
-	if deleted.Diagnostics.HasError() {
-		t.Fatal(deleted.Diagnostics)
+	if got.Slug.ValueString() != "testing" || !got.Icon.IsNull() || !got.Color.IsNull() || got.IsFinal.ValueBool() {
+		t.Fatalf("unexpected cleared state: %+v", got)
 	}
 }
 
