@@ -29,16 +29,8 @@ func TestAccWorkspaceRoleLifecycle(t *testing.T) {
 	if err := api.request(http.MethodPost, "/auth/admin/set-role", map[string]string{"userId": signup.User.ID, "role": "admin"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	workspaces := fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Terraform role acceptance"
- slug = %q
-}
-resource "kaneo_workspace" "other" {
- name = "Terraform role replacement"
- slug = %q
-}
-`, "role-"+uuid.NewV4().String(), "role-"+uuid.NewV4().String())
+	workspaces := acceptanceWorkspaceConfig("test", "Terraform role acceptance") +
+		acceptanceWorkspaceConfig("other", "Terraform role replacement")
 	config := func(name, permissions, workspace string, forbidden bool) string {
 		operator := api
 		if forbidden {

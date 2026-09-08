@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
-	"uuid"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -44,11 +43,10 @@ func (a *acceptanceAPI) checkProject(address string) resource.TestCheckFunc {
 		if project == nil {
 			return fmt.Errorf("project %s is absent from Kaneo", r.Primary.ID)
 		}
-		for attribute, field := range map[string]string{"workspace_id": "workspaceId", "name": "name", "slug": "slug", "icon": "icon", "description": "description"} {
-			value, _ := project[field].(string)
-			if value != r.Primary.Attributes[attribute] {
-				return fmt.Errorf("project %s: API %s=%q, state=%q", r.Primary.ID, field, value, r.Primary.Attributes[attribute])
-			}
+		if err := checkAcceptanceStrings(address, r, project, map[string]string{
+			"workspace_id": "workspaceId", "name": "name", "slug": "slug", "icon": "icon", "description": "description",
+		}); err != nil {
+			return err
 		}
 		public, _ := project["isPublic"].(bool)
 		if strconv.FormatBool(public) != r.Primary.Attributes["is_public"] {
@@ -61,12 +59,7 @@ func (a *acceptanceAPI) checkProject(address string) resource.TestCheckFunc {
 func TestAccProjectLifecycle(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_project.test"
-	workspaceConfig := api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Terraform Projects"
- slug = %q
-}
-`, "terraform-"+uuid.NewV4().String())
+	workspaceConfig := api.providerConfig() + acceptanceWorkspaceConfig("test", "Terraform Projects")
 	config := func(name, slug, optional string) string {
 		return workspaceConfig + fmt.Sprintf(`
 resource "kaneo_project" "test" {
@@ -183,16 +176,8 @@ data "kaneo_project" "by_slug" {
 func TestAccProjectDeletedOutsideTerraform(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_project.test"
-	workspaceConfig := api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Project Drift"
- slug = %q
-}
-resource "kaneo_workspace" "other" {
- name = "Replacement Workspace"
- slug = %q
-}
-`, "terraform-"+uuid.NewV4().String(), "terraform-"+uuid.NewV4().String())
+	workspaceConfig := api.providerConfig() + acceptanceWorkspaceConfig("test", "Project Drift") +
+		acceptanceWorkspaceConfig("other", "Replacement Workspace")
 	config := func(workspace string) string {
 		return workspaceConfig + fmt.Sprintf(`
 resource "kaneo_project" "test" {

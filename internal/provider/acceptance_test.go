@@ -105,6 +105,37 @@ func (a *acceptanceAPI) providerConfig() string {
 	return fmt.Sprintf("provider \"kaneo\" {\n endpoint = %q\n username = %q\n password = %q\n}\n", a.endpoint, a.username, a.password)
 }
 
+func acceptanceWorkspaceConfig(label, name string) string {
+	return fmt.Sprintf(`
+resource "kaneo_workspace" %q {
+ name = %q
+ slug = %q
+}
+`, label, name, "terraform-"+uuid.NewV4().String())
+}
+
+func (a *acceptanceAPI) projectConfig(name, slug string) string {
+	return a.providerConfig() + acceptanceWorkspaceConfig("test", name) + fmt.Sprintf(`
+resource "kaneo_project" "test" {
+ workspace_id = kaneo_workspace.test.id
+ name = %q
+ slug = %q
+}
+`, name, slug)
+}
+
+// Match optional API strings to Terraform's empty representation of null.
+// Field names are supplied by each check, independently of production mapping.
+func checkAcceptanceStrings(address string, r *terraform.ResourceState, remote map[string]any, fields map[string]string) error {
+	for attribute, field := range fields {
+		value, _ := remote[field].(string)
+		if value != r.Primary.Attributes[attribute] {
+			return fmt.Errorf("%s: API %s=%q, state=%q", address, field, value, r.Primary.Attributes[attribute])
+		}
+	}
+	return nil
+}
+
 // Use HTTP directly, independently of the provider's generated client and state mapping.
 func (a *acceptanceAPI) workspace(id string) (map[string]any, error) {
 	var workspaces []map[string]any
@@ -132,13 +163,9 @@ func (a *acceptanceAPI) checkWorkspace(address string) resource.TestCheckFunc {
 		if workspace == nil {
 			return fmt.Errorf("workspace %s is absent from Kaneo", r.Primary.ID)
 		}
-		for _, field := range []string{"name", "slug", "description", "logo"} {
-			value, _ := workspace[field].(string)
-			if value != r.Primary.Attributes[field] {
-				return fmt.Errorf("workspace %s: API %s=%q, state=%q", r.Primary.ID, field, value, r.Primary.Attributes[field])
-			}
-		}
-		return nil
+		return checkAcceptanceStrings(address, r, workspace, map[string]string{
+			"name": "name", "slug": "slug", "description": "description", "logo": "logo",
+		})
 	}
 }
 

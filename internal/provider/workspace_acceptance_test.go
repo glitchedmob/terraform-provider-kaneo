@@ -96,12 +96,7 @@ data "kaneo_workspace" "by_slug" {
 func TestAccWorkspaceDeletedOutsideTerraform(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_workspace.test"
-	config := api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
-  name = "Terraform Drift"
-  slug = %q
-}
-`, "terraform-"+uuid.NewV4().String())
+	config := api.providerConfig() + acceptanceWorkspaceConfig("test", "Terraform Drift")
 	var originalID string
 
 	resource.Test(t, resource.TestCase{

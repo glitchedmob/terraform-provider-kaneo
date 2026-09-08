@@ -16,7 +16,7 @@ import (
 func TestAccTaskLabelDeletedParents(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const labelAddress, taskAddress, attachmentAddress = "kaneo_label.test", "kaneo_task.test", "kaneo_task_label.test"
-	config := taskAcceptanceBase(api) + `
+	config := api.projectConfig("Terraform Tasks", "TASK") + `
 resource "kaneo_task" "test" {
  project_id = kaneo_project.test.id
  title = "Label recovery"
