@@ -74,7 +74,7 @@ func TestProviderRegistersTypes(t *testing.T) {
 	ctx := context.Background()
 	p := New("test")()
 	resources := p.Resources(ctx)
-	want := []string{"kaneo_workspace", "kaneo_project", "kaneo_column"}
+	want := []string{"kaneo_workspace", "kaneo_project", "kaneo_column", "kaneo_task"}
 	if len(resources) != len(want) {
 		t.Fatalf("expected %d resource registrations, got %d", len(want), len(resources))
 	}

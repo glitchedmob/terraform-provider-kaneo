@@ -3,6 +3,27 @@ info:
   title: Kaneo client generation fixes
   version: 1.0.0
 actions:
+  - target: $.components.schemas['Task','BoardTask'].properties.position.type
+    description: Replace the nullable floating-point task position type.
+    remove: true
+  - target: $.components.schemas['Task','BoardTask'].properties.position
+    description: Task positions are nullable PostgreSQL integers.
+    update:
+      type: [integer, 'null']
+      format: int32
+  - target: $.components.schemas['Task','BoardTask'].properties.number.type
+    description: Replace the nullable floating-point task number type.
+    remove: true
+  - target: $.components.schemas['Task','BoardTask'].properties.number
+    description: Task numbers are nullable PostgreSQL integers.
+    update:
+      type: [integer, 'null']
+      format: int32
+  - target: $.paths['/task/{id}'].put.requestBody.content['application/json'].schema.properties.position
+    description: Task updates write the same integer position.
+    update:
+      type: integer
+      format: int32
   - target: $.components.schemas.Column.properties.position
     description: Column positions are stored as PostgreSQL integers, not floating-point numbers.
     update:

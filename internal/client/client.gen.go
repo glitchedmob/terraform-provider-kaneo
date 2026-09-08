@@ -588,8 +588,8 @@ type BoardTask struct {
 	ExternalLinks []TaskExternalLink           `json:"externalLinks"`
 	Id            string                       `json:"id"`
 	Labels        []TaskLabel                  `json:"labels"`
-	Number        nullable.Nullable[float32]   `json:"number"`
-	Position      nullable.Nullable[float32]   `json:"position"`
+	Number        nullable.Nullable[int32]     `json:"number"`
+	Position      nullable.Nullable[int32]     `json:"position"`
 
 	// Priority One of: no-priority, low, medium, high, urgent.
 	Priority  string                       `json:"priority"`
@@ -1320,10 +1320,10 @@ type Task struct {
 	Id          string                       `json:"id"`
 
 	// Number Per-project counter shown as {projectSlug}-{number}.
-	Number nullable.Nullable[float32] `json:"number"`
+	Number nullable.Nullable[int32] `json:"number"`
 
 	// Position Order within its column, ascending.
-	Position nullable.Nullable[float32] `json:"position"`
+	Position nullable.Nullable[int32] `json:"position"`
 
 	// Priority One of: no-priority, low, medium, high, urgent.
 	Priority  string                       `json:"priority"`
@@ -1444,10 +1444,10 @@ type TaskWithAssignee struct {
 	Id           string                       `json:"id"`
 
 	// Number Per-project counter shown as {projectSlug}-{number}.
-	Number nullable.Nullable[float32] `json:"number"`
+	Number nullable.Nullable[int32] `json:"number"`
 
 	// Position Order within its column, ascending.
-	Position nullable.Nullable[float32] `json:"position"`
+	Position nullable.Nullable[int32] `json:"position"`
 
 	// Priority One of: no-priority, low, medium, high, urgent.
 	Priority  string                       `json:"priority"`
@@ -2425,7 +2425,7 @@ type UpdateTaskTitleJSONBody struct {
 type UpdateTaskJSONBody struct {
 	Description string                     `json:"description"`
 	DueDate     *string                    `json:"dueDate,omitempty"`
-	Position    float32                    `json:"position"`
+	Position    int32                      `json:"position"`
 	Priority    UpdateTaskJSONBodyPriority `json:"priority"`
 	ProjectId   string                     `json:"projectId"`
 	StartDate   *string                    `json:"startDate,omitempty"`
