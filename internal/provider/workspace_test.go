@@ -124,8 +124,8 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 			http.Error(writer, "workspace not found", http.StatusBadRequest)
 			return
 		}
+		json.NewEncoder(writer).Encode(s.workspace)
 		s.workspace = nil
-		json.NewEncoder(writer).Encode(body.OrganizationID)
 	default:
 		http.NotFound(writer, request)
 	}

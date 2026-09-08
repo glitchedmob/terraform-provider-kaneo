@@ -53,6 +53,13 @@ actions:
     description: Type the workspace returned after an update.
     update:
       $ref: '#/components/schemas/Workspace'
+  - target: $.paths['/auth/organization/delete'].post.responses['200'].content['application/json'].schema.type
+    description: The delete endpoint returns the deleted workspace, not a string.
+    remove: true
+  - target: $.paths['/auth/organization/delete'].post.responses['200'].content['application/json'].schema
+    description: Type the workspace returned after deletion.
+    update:
+      $ref: '#/components/schemas/Workspace'
   - target: $.paths['/auth/organization/list'].get.responses['200'].content['application/json'].schema.items
     description: Type each workspace returned by the organization list endpoint.
     update:

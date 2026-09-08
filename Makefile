@@ -20,4 +20,8 @@ lint:
 test:
 	go test -v -cover ./...
 
-.PHONY: default build generate fmt fmt-check lint test
+# Override KANEO_VERSION to test another release; Docker and Terraform are required.
+testacc:
+	bash integration/test.sh
+
+.PHONY: default build generate fmt fmt-check lint test testacc
