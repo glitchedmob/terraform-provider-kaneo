@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -37,11 +36,7 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("set TF_ACC=1 to run acceptance tests, or use make testacc")
 	}
-	endpoint := strings.TrimRight(os.Getenv("KANEO_TEST_ENDPOINT"), "/")
-	parsed, err := url.Parse(endpoint)
-	if err != nil || parsed.Scheme != "http" || (parsed.Hostname() != "localhost" && parsed.Hostname() != "127.0.0.1") {
-		t.Fatal("KANEO_TEST_ENDPOINT must point to a disposable local instance; use make testacc")
-	}
+	endpoint := startAcceptanceStack(t)
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatal(err)

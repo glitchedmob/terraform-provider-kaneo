@@ -22,6 +22,6 @@ test:
 
 # Override KANEO_VERSION to test another release; Docker and Terraform are required.
 testacc:
-	bash integration/test.sh
+	TF_ACC=1 go test -count=1 -v -timeout 15m ./internal/provider -run '^TestAcc'
 
 .PHONY: default build generate fmt fmt-check lint test testacc
