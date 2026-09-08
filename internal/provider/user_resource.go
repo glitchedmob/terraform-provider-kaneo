@@ -8,7 +8,10 @@ import (
 	"strings"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,25 +20,28 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var (
-	_ resource.Resource                = &userResource{}
-	_ resource.ResourceWithConfigure   = &userResource{}
-	_ resource.ResourceWithImportState = &userResource{}
+	_ resource.Resource                     = &userResource{}
+	_ resource.ResourceWithConfigure        = &userResource{}
+	_ resource.ResourceWithImportState      = &userResource{}
+	_ resource.ResourceWithConfigValidators = &userResource{}
 )
 
 type userResource struct {
 	client *kaneoclient.ClientWithResponses
 }
 type userModel struct {
-	ID            types.String `tfsdk:"id"`
-	Email         types.String `tfsdk:"email"`
-	Name          types.String `tfsdk:"name"`
-	Role          types.String `tfsdk:"role"`
-	EmailVerified types.Bool   `tfsdk:"email_verified"`
-	Password      types.String `tfsdk:"password"`
+	ID                types.String `tfsdk:"id"`
+	Email             types.String `tfsdk:"email"`
+	Name              types.String `tfsdk:"name"`
+	Role              types.String `tfsdk:"role"`
+	EmailVerified     types.Bool   `tfsdk:"email_verified"`
+	PasswordWO        types.String `tfsdk:"password_wo"`
+	PasswordWOVersion types.Int64  `tfsdk:"password_wo_version"`
 }
 
 func newUserResource() resource.Resource { return &userResource{} }
@@ -46,15 +52,45 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Kaneo instance user. Requires an instance admin. Does not create workspace memberships.",
 		Attributes: map[string]schema.Attribute{
-			"id":             schema.StringAttribute{Computed: true, MarkdownDescription: "User identifier.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"email":          schema.StringAttribute{Required: true, MarkdownDescription: "User email. Kaneo stores email in lowercase; equivalent casing is preserved in state.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
-			"name":           schema.StringAttribute{Required: true, MarkdownDescription: "Display name.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
-			"role":           schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("user"), MarkdownDescription: "Instance role: user or admin. Defaults to user.", Validators: []validator.String{stringvalidator.OneOf("user", "admin")}},
-			"email_verified": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), MarkdownDescription: "Whether the email is verified. Defaults to false. Set true only for identities you have verified; this can enable OIDC account linking depending on server settings."},
-			"password":       schema.StringAttribute{Optional: true, Sensitive: true, MarkdownDescription: "Credential password, stored in Terraform state. Omit to create without password login. Changes set a new password. Cannot be read or imported; removing this attribute does not remove the remote password.", Validators: []validator.String{stringvalidator.LengthBetween(8, 128)}},
+			"id":                  schema.StringAttribute{Computed: true, MarkdownDescription: "User identifier.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"email":               schema.StringAttribute{Required: true, MarkdownDescription: "User email. Kaneo stores email in lowercase; equivalent casing is preserved in state.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"name":                schema.StringAttribute{Required: true, MarkdownDescription: "Display name.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"role":                schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("user"), MarkdownDescription: "Instance role: user or admin. Defaults to user.", Validators: []validator.String{stringvalidator.OneOf("user", "admin")}},
+			"email_verified":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), MarkdownDescription: "Whether the email is verified. Defaults to false. Set true only for identities you have verified; this can enable OIDC account linking depending on server settings."},
+			"password_wo":         schema.StringAttribute{Optional: true, WriteOnly: true, Sensitive: true, MarkdownDescription: "Credential password (8-128 bytes), never stored in Terraform plan or state. Requires Terraform 1.11 or later. Configure with password_wo_version; omit both to create without password login. Use an ephemeral input or ephemeral.random_password to avoid storing the source value. Removing both attributes stops management without removing the remote password.", Validators: []validator.String{stringvalidator.LengthBetween(8, 128)}},
+			"password_wo_version": schema.Int64Attribute{Optional: true, MarkdownDescription: "Positive password change version, stored in state. Configure with password_wo. Change this value to apply a new password; changing only password_wo or unrelated attributes does not reset it. Cannot be read or imported. Failed password changes retain the last successfully applied version.", Validators: []validator.Int64{int64validator.AtLeast(1)}},
 		},
 	}
 }
+func (r *userResource) ConfigValidators(context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{resourcevalidator.RequiredTogether(path.MatchRoot("password_wo"), path.MatchRoot("password_wo_version"))}
+}
+
+// Write-only values exist only in Config. Check again at apply because ephemeral
+// values can differ from validation/plan, including becoming null.
+func userPasswordConfig(ctx context.Context, config tfsdk.Config) (types.String, diag.Diagnostics) {
+	var password types.String
+	var version types.Int64
+	diags := config.GetAttribute(ctx, path.Root("password_wo"), &password)
+	diags.Append(config.GetAttribute(ctx, path.Root("password_wo_version"), &version)...)
+	if diags.HasError() {
+		return password, diags
+	}
+	if password.IsUnknown() || version.IsUnknown() {
+		diags.AddError("Unknown User Password Configuration", "password_wo and password_wo_version must be known during apply.")
+	} else if password.IsNull() != version.IsNull() {
+		diags.AddError("Incomplete User Password Configuration", "Configure password_wo and password_wo_version together, or omit both.")
+	} else if !password.IsNull() {
+		if n := len(password.ValueString()); n < 8 || n > 128 {
+			diags.AddAttributeError(path.Root("password_wo"), "Invalid User Password Length", "password_wo must contain 8-128 bytes.")
+		}
+		if version.ValueInt64() < 1 {
+			diags.AddAttributeError(path.Root("password_wo_version"), "Invalid User Password Version", "password_wo_version must be positive.")
+		}
+	}
+	return password, diags
+}
+
 func (r *userResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -102,6 +138,8 @@ func (r *userResource) setPassword(ctx context.Context, id string, password type
 func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan userModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	password, diags := userPasswordConfig(ctx, req.Config)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -120,10 +158,11 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		resp.Diagnostics.AddError("Unable to Create User", "Create response did not contain a user ID. Check the server before retrying; import the user if creation succeeded.")
 		return
 	}
-	password := plan.Password
+	version := plan.PasswordWOVersion
 	plan.fromAPI(response.JSON200.User)
 	// Persist the created ID before the separate password operation can fail.
-	plan.Password = types.StringNull()
+	plan.PasswordWO = types.StringNull()
+	plan.PasswordWOVersion = types.Int64Null()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -132,7 +171,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		resp.Diagnostics.AddError("Unable to Set User Password", err.Error())
 		return
 	}
-	plan.Password = password
+	plan.PasswordWOVersion = version
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -165,6 +204,8 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	var plan, state userModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	password, diags := userPasswordConfig(ctx, req.Config)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -181,20 +222,21 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Unable to Update User", "Update response did not contain a user ID.")
 		return
 	}
-	password := plan.Password
+	version := plan.PasswordWOVersion
 	plan.fromAPI(*response.JSON200)
-	plan.Password = state.Password
+	plan.PasswordWO = types.StringNull()
+	plan.PasswordWOVersion = state.PasswordWOVersion
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !password.Equal(state.Password) {
+	if !version.IsNull() && !version.Equal(state.PasswordWOVersion) {
 		if err := r.setPassword(ctx, plan.ID.ValueString(), password); err != nil {
 			resp.Diagnostics.AddError("Unable to Set User Password", err.Error())
 			return
 		}
 	}
-	plan.Password = password
+	plan.PasswordWOVersion = version
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

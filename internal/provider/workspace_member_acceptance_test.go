@@ -31,7 +31,8 @@ resource "kaneo_workspace" "other" {
 resource "kaneo_user" "recipient" {
  name = "Independent recipient"
  email = %q
- password = %q
+ password_wo = %q
+ password_wo_version = 1
  email_verified = true
 }
 resource "kaneo_workspace_role" "test" {
