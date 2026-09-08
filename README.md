@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/glitchedmob/terraform-provider-kaneo/actions/workflows/test.yml/badge.svg)](https://github.com/glitchedmob/terraform-provider-kaneo/actions/workflows/test.yml)
 
-This repository contains the initial scaffold for the Kaneo Terraform provider. Provider functionality has not been implemented yet.
+The Kaneo provider manages Kaneo resources through Terraform for both cloud-hosted and self-hosted installations.
 
 ## Requirements
 
