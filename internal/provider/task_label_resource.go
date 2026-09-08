@@ -46,9 +46,9 @@ func (r *taskLabelResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		MarkdownDescription: "Attaches a workspace-level label to a task. Kaneo creates a task-specific copy with a different ID. Destroying this resource removes only that copy, not the workspace label, task, or unrelated task labels.",
 		Attributes: map[string]schema.Attribute{
 			"id":           schema.StringAttribute{MarkdownDescription: "Task-label copy identifier returned by Kaneo. Different from label_id.", Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"label_id":     schema.StringAttribute{MarkdownDescription: "Source workspace-level label ID, not a task-copy ID. Changing this replaces the attachment.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"task_id":      schema.StringAttribute{MarkdownDescription: "Task identifier in the same workspace as the source label. Changing this replaces the attachment.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"workspace_id": schema.StringAttribute{MarkdownDescription: "Workspace identifier.", Computed: true},
+			"label_id":     schema.StringAttribute{MarkdownDescription: "Non-empty source workspace-level label ID. Task-specific copies are rejected because Kaneo's attach endpoint can move them away from another task. Changing this replaces the attachment.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"task_id":      schema.StringAttribute{MarkdownDescription: "Non-empty task ID in the same workspace as the source label. Changing this replaces the attachment.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"workspace_id": schema.StringAttribute{MarkdownDescription: "Workspace identifier shared by the task and source label.", Computed: true},
 		},
 	}
 }

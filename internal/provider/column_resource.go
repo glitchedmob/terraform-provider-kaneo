@@ -49,7 +49,7 @@ func (r *columnResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Column display name. Renaming does not change the slug.", Required: true,
+				MarkdownDescription: "Column display name. Kaneo derives the slug from this name at creation and requires at least one letter or number. Renaming a column does not change its slug.", Required: true,
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"slug": schema.StringAttribute{
@@ -68,7 +68,7 @@ func (r *columnResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:            true, Computed: true, Default: booldefault.StaticBool(false),
 			},
 			"position": schema.Int64Attribute{
-				MarkdownDescription: "Absolute board position, from 0 to 2147483647. New columns are appended when omitted. Setting this does not shift other columns.",
+				MarkdownDescription: "Absolute board position, an integer from `0` to `2147483647`. When omitted, new columns are appended and existing columns retain their current position. Setting this does not shift other columns.",
 				Optional:            true, Computed: true,
 				Validators: []validator.Int64{int64validator.Between(0, math.MaxInt32)},
 			},

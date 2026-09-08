@@ -43,18 +43,18 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_id": schema.StringAttribute{
-				MarkdownDescription: "Workspace identifier. Changing this replaces the project and deletes its contents.",
+				MarkdownDescription: "Workspace identifier. Changing this replaces the project rather than moving it and deletes its old contents without copying them.",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Project name.",
+				MarkdownDescription: "Project name. Must not be empty.",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"slug": schema.StringAttribute{
-				MarkdownDescription: "Prefix used in task identifiers, for example KAN in KAN-12.",
+				MarkdownDescription: "Prefix used in task identifiers, for example `PLAT` in `PLAT-12`. Must not be empty.",
 				Required:            true,
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
@@ -81,7 +81,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed:            true,
 			},
 			"archived_at": schema.StringAttribute{
-				MarkdownDescription: "Project archive timestamp, or null if not archived. Archiving is not managed by this resource.",
+				MarkdownDescription: "Project archive timestamp, or null if not archived. This resource reads archived projects but does not manage archiving or sidebar order.",
 				Computed:            true,
 			},
 		},

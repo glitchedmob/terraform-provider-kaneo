@@ -43,7 +43,7 @@ func (r *taskResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		MarkdownDescription: "Manages a Kaneo task. Deleting or replacing a task permanently deletes its contents, including comments and attachments.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Task identifier.", Computed: true,
+				MarkdownDescription: "Task identifier. This is different from the displayed identifier such as `PLAT-12`.", Computed: true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"project_id": schema.StringAttribute{
@@ -52,7 +52,7 @@ func (r *taskResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"title": schema.StringAttribute{
-				MarkdownDescription: "Task title.", Required: true,
+				MarkdownDescription: "Non-empty task title.", Required: true,
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"description": schema.StringAttribute{
@@ -65,12 +65,12 @@ func (r *taskResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"priority": schema.StringAttribute{
-				MarkdownDescription: "Task priority. Defaults to no-priority.",
+				MarkdownDescription: "One of `no-priority`, `low`, `medium`, `high`, or `urgent`. Defaults to `no-priority`.",
 				Optional:            true, Computed: true, Default: stringdefault.StaticString("no-priority"),
 				Validators: []validator.String{stringvalidator.OneOf("no-priority", "low", "medium", "high", "urgent")},
 			},
 			"assignee_id": schema.StringAttribute{
-				MarkdownDescription: "Assignable user ID in the project's workspace. Omit to unassign.", Optional: true,
+				MarkdownDescription: "Assignable user ID in the project's workspace, not an email address. Omit to unassign. Empty or whitespace-padded IDs are not supported.", Optional: true,
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"start_date": schema.StringAttribute{
@@ -80,10 +80,10 @@ func (r *taskResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				MarkdownDescription: "Due timestamp in RFC3339 format with at most millisecond precision. Must not precede start_date. Omit to clear it.", Optional: true,
 			},
 			"number": schema.Int64Attribute{
-				MarkdownDescription: "API-assigned per-project task number, displayed after the project slug.", Computed: true,
+				MarkdownDescription: "API-assigned per-project task number, such as `12` in `PLAT-12`. May be null for legacy tasks.", Computed: true,
 			},
 			"position": schema.Int64Attribute{
-				MarkdownDescription: "API-assigned order within the column. Updates preserve the refreshed position; ordering is not managed.", Computed: true,
+				MarkdownDescription: "API-assigned order within the column. May be null for legacy tasks. Updates preserve the refreshed position; ordering is not managed.", Computed: true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Task creation timestamp.", Computed: true,
