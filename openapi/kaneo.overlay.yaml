@@ -439,3 +439,75 @@ actions:
                     properties:
                       id:
                         type: string
+  - target: $.components.schemas
+    description: Better Auth 1.6.25 membership wire shapes. Mutations return bare members or invitations except remove-member.
+    update:
+      WorkspaceMembershipMember:
+        type: object
+        required: [id, organizationId, userId, role]
+        properties:
+          id: {type: string}
+          organizationId: {type: string}
+          userId: {type: string}
+          role: {type: string}
+          user:
+            type: object
+            required: [id, email]
+            properties:
+              id: {type: string}
+              email: {type: string}
+      WorkspaceInvitation:
+        type: object
+        required: [id, organizationId, email, status, expiresAt]
+        properties:
+          id: {type: string}
+          organizationId: {type: string}
+          email: {type: string}
+          role: {type: [string, 'null']}
+          status: {type: string}
+          expiresAt: {type: string, format: date-time}
+  - target: $.paths['/auth/organization/list-members'].get
+    update:
+      parameters:
+        - {name: organizationId, in: query, required: true, schema: {type: string}}
+        - {name: limit, in: query, required: true, schema: {type: integer, minimum: 1}}
+        - {name: offset, in: query, required: true, schema: {type: integer, minimum: 0}}
+        - {name: sortBy, in: query, required: true, schema: {type: string}}
+        - {name: sortDirection, in: query, required: true, schema: {type: string, enum: [asc, desc], x-enum-varnames: [MemberSortAscending, MemberSortDescending]}}
+      responses:
+        '200':
+          description: Paginated members with joined users; total counts all pages.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [members, total]
+                properties:
+                  members: {type: array, items: {$ref: '#/components/schemas/WorkspaceMembershipMember'}}
+                  # Keep a pointer to reject a missing required total at runtime.
+                  total: {type: integer, minimum: 0, x-go-type: '*int'}
+  - target: $.paths['/auth/organization/list-invitations'].get
+    update:
+      parameters:
+        - {name: organizationId, in: query, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: Bare invitation array, capped at 100 stored rows without pagination.
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/WorkspaceInvitation'}}
+  - target: $.paths['/auth/organization/update-member-role'].post.responses['200'].content['application/json'].schema
+    remove: true
+  - target: $.paths['/auth/organization/invite-member'].post.responses['200'].content['application/json'].schema
+    remove: true
+  - target: $.paths['/auth/organization/update-member-role'].post.responses['200'].content['application/json']
+    update:
+      schema: {$ref: '#/components/schemas/WorkspaceMembershipMember'}
+  - target: $.paths['/auth/organization/invite-member'].post.responses['200'].content['application/json']
+    update:
+      schema: {$ref: '#/components/schemas/WorkspaceInvitation'}
+  - target: $.paths['/auth/organization/cancel-invitation'].post.responses['200']
+    update:
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/WorkspaceInvitation'}
