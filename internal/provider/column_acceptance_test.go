@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
-	"uuid"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -36,11 +35,10 @@ func (a *acceptanceAPI) checkColumn(address string) resource.TestCheckFunc {
 			if column["id"] != r.Primary.ID {
 				continue
 			}
-			for attribute, field := range map[string]string{"project_id": "projectId", "name": "name", "slug": "slug", "icon": "icon", "color": "color"} {
-				value, _ := column[field].(string)
-				if value != r.Primary.Attributes[attribute] {
-					return fmt.Errorf("column %s: API %s=%q, state=%q", r.Primary.ID, field, value, r.Primary.Attributes[attribute])
-				}
+			if err := checkAcceptanceStrings(address, r, column, map[string]string{
+				"project_id": "projectId", "name": "name", "slug": "slug", "icon": "icon", "color": "color",
+			}); err != nil {
+				return err
 			}
 			final, _ := column["isFinal"].(bool)
 			position, _ := column["position"].(float64)
@@ -54,17 +52,7 @@ func (a *acceptanceAPI) checkColumn(address string) resource.TestCheckFunc {
 }
 
 func columnAcceptanceBase(api *acceptanceAPI) string {
-	return api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Terraform Columns"
- slug = %q
-}
-resource "kaneo_project" "test" {
- workspace_id = kaneo_workspace.test.id
- name = "Terraform Columns"
- slug = "COL"
-}
-`, "terraform-"+uuid.NewV4().String())
+	return api.projectConfig("Terraform Columns", "COL")
 }
 
 func TestAccColumnLifecycle(t *testing.T) {

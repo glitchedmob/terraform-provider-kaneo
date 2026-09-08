@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"regexp"
 	"testing"
-	"uuid"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -59,7 +58,7 @@ func (a *acceptanceAPI) labelAbsent(workspaceID, id string) error {
 func TestAccLabelAndTaskLabelLifecycle(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const labelAddress, attachmentAddress = "kaneo_label.test", "kaneo_task_label.test"
-	base := taskAcceptanceBase(api) + `
+	base := api.projectConfig("Terraform Tasks", "TASK") + `
 resource "kaneo_task" "one" {
  project_id = kaneo_project.test.id
  title = "First task"
@@ -222,12 +221,7 @@ resource "kaneo_task_label" "duplicate" {
 func TestAccLabelDeletedOutsideTerraform(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_label.test"
-	base := taskAcceptanceBase(api) + fmt.Sprintf(`
-resource "kaneo_workspace" "other" {
- name = "Other workspace"
- slug = %q
-}
-`, "terraform-"+uuid.NewV4().String())
+	base := api.projectConfig("Terraform Tasks", "TASK") + acceptanceWorkspaceConfig("other", "Other workspace")
 	config := func(workspace string) string {
 		return base + fmt.Sprintf(`
 resource "kaneo_label" "test" {

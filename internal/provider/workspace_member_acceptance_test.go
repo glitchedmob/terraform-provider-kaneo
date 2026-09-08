@@ -19,15 +19,8 @@ func TestAccWorkspaceMemberLifecycle(t *testing.T) {
 	email, password := "member-"+uuid.NewV4().String()+"@example.com", uuid.NewV4().String()
 	recipient := userAcceptanceSession(api, email, password)
 	const address = "kaneo_workspace_member.test"
-	base := api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Terraform membership acceptance"
- slug = %q
-}
-resource "kaneo_workspace" "other" {
- name = "Unrelated workspace"
- slug = %q
-}
+	base := api.providerConfig() + acceptanceWorkspaceConfig("test", "Terraform membership acceptance") +
+		acceptanceWorkspaceConfig("other", "Unrelated workspace") + fmt.Sprintf(`
 resource "kaneo_user" "recipient" {
  name = "Independent recipient"
  email = %q
@@ -40,7 +33,7 @@ resource "kaneo_workspace_role" "test" {
  name = "reviewer"
  permissions = {task = ["read"]}
 }
-`, "member-"+uuid.NewV4().String(), "other-"+uuid.NewV4().String(), email, password)
+`, email, password)
 	config := func(role string) string {
 		return base + fmt.Sprintf(`
 resource "kaneo_workspace_member" "test" {

@@ -9,26 +9,11 @@ import (
 	"strconv"
 	"testing"
 	"time"
-	"uuid"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
-
-func taskAcceptanceBase(api *acceptanceAPI) string {
-	return api.providerConfig() + fmt.Sprintf(`
-resource "kaneo_workspace" "test" {
- name = "Terraform Tasks"
- slug = %q
-}
-resource "kaneo_project" "test" {
- workspace_id = kaneo_workspace.test.id
- name = "Terraform Tasks"
- slug = "TASK"
-}
-`, "terraform-"+uuid.NewV4().String())
-}
 
 func (a *acceptanceAPI) task(id string) (map[string]any, error) {
 	var task map[string]any
@@ -46,13 +31,10 @@ func (a *acceptanceAPI) checkTask(address string) resource.TestCheckFunc {
 		if err != nil {
 			return err
 		}
-		for attribute, field := range map[string]string{
+		if err := checkAcceptanceStrings(address, r, task, map[string]string{
 			"project_id": "projectId", "title": "title", "description": "description", "status": "status", "priority": "priority", "assignee_id": "userId",
-		} {
-			value, _ := task[field].(string)
-			if value != r.Primary.Attributes[attribute] {
-				return fmt.Errorf("task %s: API %s=%q, state=%q", r.Primary.ID, field, value, r.Primary.Attributes[attribute])
-			}
+		}); err != nil {
+			return err
 		}
 		for attribute, field := range map[string]string{"start_date": "startDate", "due_date": "dueDate", "created_at": "createdAt"} {
 			remote, _ := task[field].(string)
@@ -138,7 +120,7 @@ func (a *acceptanceAPI) taskAbsent(projectID, id string) error {
 func TestAccTaskLifecycle(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_task.test"
-	base := taskAcceptanceBase(api) + `
+	base := api.projectConfig("Terraform Tasks", "TASK") + `
 resource "kaneo_column" "testing" {
  project_id = kaneo_project.test.id
  name = "Testing"
@@ -239,7 +221,7 @@ data "kaneo_task" "by_id" {
 func TestAccTaskDeletedOutsideTerraform(t *testing.T) {
 	api := newAcceptanceAPI(t)
 	const address = "kaneo_task.test"
-	base := taskAcceptanceBase(api) + `
+	base := api.projectConfig("Terraform Tasks", "TASK") + `
 resource "kaneo_project" "other" {
  workspace_id = kaneo_workspace.test.id
  name = "Other Project"
