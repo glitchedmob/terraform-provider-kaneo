@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,11 +29,20 @@ func userTestResource(t *testing.T, handler http.HandlerFunc) (*userResource, tf
 	schema := &resource.SchemaResponse{}
 	r.Schema(t.Context(), resource.SchemaRequest{}, schema)
 	state := tfsdk.State{Schema: schema.Schema}
-	model := userModel{ID: types.StringValue("user-1"), Name: types.StringValue("Test"), Email: types.StringValue("Test@Example.com"), Role: types.StringValue("user"), EmailVerified: types.BoolValue(false), Password: types.StringValue("secret-password")}
+	model := userModel{ID: types.StringValue("user-1"), Name: types.StringValue("Test"), Email: types.StringValue("Test@Example.com"), Role: types.StringValue("user"), EmailVerified: types.BoolValue(false), PasswordWO: types.StringNull(), PasswordWOVersion: types.Int64Value(1)}
 	if d := state.Set(t.Context(), &model); d.HasError() {
 		t.Fatal(d)
 	}
 	return r, state, tfsdk.Plan{Schema: schema.Schema, Raw: state.Raw}
+}
+
+func userTestConfig(t *testing.T, plan tfsdk.Plan, password types.String) tfsdk.Config {
+	t.Helper()
+	configured := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+	if d := configured.SetAttribute(t.Context(), path.Root("password_wo"), password); d.HasError() {
+		t.Fatal(d)
+	}
+	return tfsdk.Config{Schema: plan.Schema, Raw: configured.Raw}
 }
 
 func TestUserReadAndDeleteErrors(t *testing.T) {
@@ -63,7 +73,7 @@ func TestUserReadAndDeleteErrors(t *testing.T) {
 	}
 }
 
-func TestUserReadPreservesPasswordAndEmailCase(t *testing.T) {
+func TestUserReadPreservesPasswordVersionAndEmailCase(t *testing.T) {
 	for _, imported := range []bool{false, true} {
 		t.Run(fmt.Sprint(imported), func(t *testing.T) {
 			r, state, _ := userTestResource(t, func(w http.ResponseWriter, req *http.Request) {
@@ -74,7 +84,7 @@ func TestUserReadPreservesPasswordAndEmailCase(t *testing.T) {
 				fmt.Fprint(w, `{"id":"user-1","name":"Drift","email":"test@example.com","role":"admin","emailVerified":true}`)
 			})
 			if imported {
-				empty := userModel{ID: types.StringNull(), Email: types.StringNull(), Name: types.StringNull(), Role: types.StringNull(), Password: types.StringNull(), EmailVerified: types.BoolNull()}
+				empty := userModel{ID: types.StringNull(), Email: types.StringNull(), Name: types.StringNull(), Role: types.StringNull(), PasswordWO: types.StringNull(), PasswordWOVersion: types.Int64Null(), EmailVerified: types.BoolNull()}
 				state.Set(t.Context(), &empty)
 				result := &resource.ImportStateResponse{State: state}
 				r.ImportState(t.Context(), resource.ImportStateRequest{ID: "user-1"}, result)
@@ -96,10 +106,10 @@ func TestUserReadPreservesPasswordAndEmailCase(t *testing.T) {
 				t.Fatal("drift not refreshed")
 			}
 			if imported {
-				if !model.Password.IsNull() || model.Email.ValueString() != "test@example.com" {
+				if !model.PasswordWO.IsNull() || !model.PasswordWOVersion.IsNull() || model.Email.ValueString() != "test@example.com" {
 					t.Fatal("import must not invent a password or email casing")
 				}
-			} else if model.Password.ValueString() != "secret-password" || model.Email.ValueString() != "Test@Example.com" {
+			} else if !model.PasswordWO.IsNull() || model.PasswordWOVersion.ValueInt64() != 1 || model.Email.ValueString() != "Test@Example.com" {
 				t.Fatal("read lost password or equivalent email casing")
 			}
 		})
@@ -143,17 +153,17 @@ func TestUserPartialCreateAndUpdate(t *testing.T) {
 			if update {
 				var old userModel
 				state.Get(t.Context(), &old)
-				old.Password = types.StringValue("old-password")
+				old.PasswordWOVersion = types.Int64Value(2)
 				state.Set(t.Context(), &old)
 				resp := &resource.UpdateResponse{State: state}
-				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state}, resp)
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state, Config: userTestConfig(t, plan, types.StringValue("secret-password"))}, resp)
 				if !resp.Diagnostics.HasError() || strings.Contains(fmt.Sprint(resp.Diagnostics), "secret-password") {
 					t.Fatalf("diagnostics: %v", resp.Diagnostics)
 				}
 				result = resp.State
 			} else {
 				resp := &resource.CreateResponse{State: tfsdk.State{Schema: state.Schema}}
-				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, resp)
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan, Config: userTestConfig(t, plan, types.StringValue("secret-password"))}, resp)
 				if !resp.Diagnostics.HasError() || strings.Contains(fmt.Sprint(resp.Diagnostics), "secret-password") {
 					t.Fatalf("diagnostics: %v", resp.Diagnostics)
 				}
@@ -166,7 +176,7 @@ func TestUserPartialCreateAndUpdate(t *testing.T) {
 			if model.ID.ValueString() != "user-1" {
 				t.Fatal("partial failure lost ID")
 			}
-			if update && model.Password.ValueString() != "old-password" || !update && !model.Password.IsNull() {
+			if !model.PasswordWO.IsNull() || update && model.PasswordWOVersion.ValueInt64() != 2 || !update && !model.PasswordWOVersion.IsNull() {
 				t.Fatal("failed password was saved")
 			}
 			if len(calls) != 2 {
@@ -189,7 +199,7 @@ func TestUserRejectsMalformedSuccess(t *testing.T) {
 				t.Fatal("malformed read must fail without removing state")
 			}
 			create := &resource.CreateResponse{State: tfsdk.State{Schema: state.Schema}}
-			r.Create(t.Context(), resource.CreateRequest{Plan: plan}, create)
+			r.Create(t.Context(), resource.CreateRequest{Plan: plan, Config: userTestConfig(t, plan, types.StringValue("secret-password"))}, create)
 			if !create.Diagnostics.HasError() {
 				t.Fatal("malformed create succeeded")
 			}
@@ -222,22 +232,27 @@ func TestUserOptionalPassword(t *testing.T) {
 			if operation != "update unchanged password" {
 				var model userModel
 				state.Get(t.Context(), &model)
-				model.Password = types.StringNull()
+				model.PasswordWOVersion = types.Int64Null()
 				planned := tfsdk.State{Schema: state.Schema}
 				planned.Set(t.Context(), &model)
 				plan.Raw = planned.Raw
 			}
+			password := types.StringNull()
+			if operation == "update unchanged password" {
+				password = types.StringValue("different-secret")
+			}
+			config := userTestConfig(t, plan, password)
 			var result tfsdk.State
 			if operation == "create without password" {
 				resp := &resource.CreateResponse{State: tfsdk.State{Schema: state.Schema}}
-				r.Create(t.Context(), resource.CreateRequest{Plan: plan}, resp)
+				r.Create(t.Context(), resource.CreateRequest{Plan: plan, Config: config}, resp)
 				if resp.Diagnostics.HasError() {
 					t.Fatal(resp.Diagnostics)
 				}
 				result = resp.State
 			} else {
 				resp := &resource.UpdateResponse{State: state}
-				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state}, resp)
+				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state, Config: config}, resp)
 				if resp.Diagnostics.HasError() {
 					t.Fatal(resp.Diagnostics)
 				}
@@ -250,7 +265,7 @@ func TestUserOptionalPassword(t *testing.T) {
 			if d := result.Get(t.Context(), &model); d.HasError() {
 				t.Fatal(d)
 			}
-			if model.Password.IsNull() != (operation != "update unchanged password") {
+			if !model.PasswordWO.IsNull() || model.PasswordWOVersion.IsNull() != (operation != "update unchanged password") {
 				t.Fatal("unexpected password state")
 			}
 		})
