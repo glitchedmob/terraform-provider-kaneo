@@ -27,7 +27,8 @@ var acceptanceProviderFactories = map[string]func() (tfprotov6.ProviderServer, e
 
 type acceptanceAPI struct {
 	endpoint string
-	key      string
+	username string
+	password string
 	userID   string
 	client   *http.Client
 }
@@ -42,15 +43,19 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := &acceptanceAPI{endpoint: endpoint, client: &http.Client{Jar: jar, Timeout: 30 * time.Second}}
+	api := &acceptanceAPI{
+		endpoint: endpoint,
+		username: "terraform-" + uuid.NewV4().String() + "@example.com",
+		password: uuid.NewV4().String(),
+		client:   &http.Client{Jar: jar, Timeout: 30 * time.Second},
+	}
 	var signup struct {
 		User struct {
 			ID string `json:"id"`
 		} `json:"user"`
 	}
 	if err := api.request(http.MethodPost, "/auth/sign-up/email", map[string]string{
-		"name": "Terraform Acceptance", "email": "terraform-" + uuid.NewV4().String() + "@example.com",
-		"password": uuid.NewV4().String(),
+		"name": "Terraform Acceptance", "email": api.username, "password": api.password,
 	}, &signup); err != nil {
 		t.Fatalf("create test user: %s", err)
 	}
@@ -58,18 +63,6 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 	if api.userID == "" {
 		t.Fatal("signup returned no user ID")
 	}
-	var response struct {
-		Key string `json:"key"`
-	}
-	if err := api.request(http.MethodPost, "/auth/api-key/create", map[string]string{"name": "terraform-acceptance"}, &response); err != nil {
-		t.Fatalf("create API key: %s", err)
-	}
-	if response.Key == "" {
-		t.Fatal("API key creation returned no key")
-	}
-	api.key = response.Key
-	// Discard the signup session so subsequent checks prove API-key authentication works.
-	api.client = &http.Client{Timeout: 30 * time.Second}
 	return api
 }
 
@@ -88,9 +81,6 @@ func (a *acceptanceAPI) request(method, path string, body, result any) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", strings.TrimSuffix(a.endpoint, "/api"))
-	if a.key != "" {
-		req.Header.Set("x-api-key", a.key)
-	}
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
@@ -108,7 +98,7 @@ func (a *acceptanceAPI) request(method, path string, body, result any) error {
 }
 
 func (a *acceptanceAPI) providerConfig() string {
-	return fmt.Sprintf("provider \"kaneo\" {\n endpoint = %q\n api_key = %q\n}\n", a.endpoint, a.key)
+	return fmt.Sprintf("provider \"kaneo\" {\n endpoint = %q\n username = %q\n password = %q\n}\n", a.endpoint, a.username, a.password)
 }
 
 // Use HTTP directly, independently of the provider's generated client and state mapping.

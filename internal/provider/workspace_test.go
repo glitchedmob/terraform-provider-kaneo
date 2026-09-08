@@ -50,7 +50,10 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if authorization := request.Header.Get("Authorization"); authorization != "Bearer test-key" {
+	if handleTestSignIn(s.t, writer, request) {
+		return
+	}
+	if authorization := request.Header.Get("Authorization"); authorization != "Bearer test-session" {
 		s.t.Errorf("expected bearer authorization, got %q", authorization)
 	}
 	writer.Header().Set("Content-Type", "application/json")
@@ -133,7 +136,7 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 
 func (s *workspaceAPIServer) client(t *testing.T) *workspaceResource {
 	t.Helper()
-	client, err := newAPIClient(s.server.URL+"/api", "test-key", "test")
+	client, err := newAPIClient(t.Context(), s.server.URL+"/api", "test@example.com", " test-password ", "test")
 	if err != nil {
 		t.Fatalf("create API client: %v", err)
 	}

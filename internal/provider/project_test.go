@@ -22,14 +22,17 @@ const projectFixture = `{"id":"project-1","workspaceId":"workspace-1","name":"En
 func projectTestClient(t *testing.T, handler http.HandlerFunc) *kaneoclient.ClientWithResponses {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer test-key" {
-			t.Error("missing API key")
+		if handleTestSignIn(t, w, r) {
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer test-session" {
+			t.Error("missing session token")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		handler(w, r)
 	}))
 	t.Cleanup(server.Close)
-	client, err := newAPIClient(server.URL, "test-key", "test")
+	client, err := newAPIClient(t.Context(), server.URL, "test@example.com", " test-password ", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
