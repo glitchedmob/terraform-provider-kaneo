@@ -148,12 +148,9 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	id := plan.ID.ValueString()
-	name := plan.Name.ValueString()
-	slug := plan.Slug.ValueString()
-	body := kaneoclient.UpdateOrganizationJSONRequestBody{OrganizationId: &id}
-	body.Data.Name = &name
-	body.Data.Slug = &slug
+	body := kaneoclient.UpdateOrganizationJSONRequestBody{OrganizationId: new(plan.ID.ValueString())}
+	body.Data.Name = new(plan.Name.ValueString())
+	body.Data.Slug = new(plan.Slug.ValueString())
 	body.Data.Description = nullableStringFromTerraform(plan.Description)
 	body.Data.Logo = nullableStringFromTerraform(plan.Logo)
 

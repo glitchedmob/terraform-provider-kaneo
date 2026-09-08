@@ -392,7 +392,7 @@ func TestWorkspaceModelUsesMetadataDescriptionFallback(t *testing.T) {
 }
 
 func workspaceFromMetadata(description string) kaneoclient.Workspace {
-	metadata := nullable.NewNullableWithValue(map[string]interface{}{"description": description})
+	metadata := nullable.NewNullableWithValue(map[string]any{"description": description})
 	return kaneoclient.Workspace{
 		Id:        "workspace-1",
 		Name:      "Engineering",

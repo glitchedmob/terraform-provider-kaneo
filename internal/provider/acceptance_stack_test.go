@@ -47,10 +47,7 @@ func startAcceptanceStack(t *testing.T) string {
 
 func captureAcceptanceLogs(t *testing.T, stack compose.ComposeStack) {
 	t.Helper()
-	logDir := os.Getenv("KANEO_TEST_LOG_DIR")
-	if logDir == "" && !t.Failed() {
-		return
-	}
+	logDir := t.ArtifactDir()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	for _, service := range stack.Services() {
@@ -72,15 +69,8 @@ func captureAcceptanceLogs(t *testing.T, stack compose.ComposeStack) {
 		if t.Failed() {
 			t.Logf("%s logs:\n%s", service, data)
 		}
-		if logDir != "" {
-			dir := filepath.Join(logDir, t.Name())
-			if err := os.MkdirAll(dir, 0o700); err != nil {
-				t.Errorf("create log directory: %s", err)
-				continue
-			}
-			if err := os.WriteFile(filepath.Join(dir, service+".log"), data, 0o600); err != nil {
-				t.Errorf("save %s logs: %s", service, err)
-			}
+		if err := os.WriteFile(filepath.Join(logDir, service+".log"), data, 0o600); err != nil {
+			t.Errorf("save %s logs: %s", service, err)
 		}
 	}
 }

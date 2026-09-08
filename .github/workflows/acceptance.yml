@@ -33,11 +33,9 @@ jobs:
           terraform_version: "1.14.7"
           terraform_wrapper: false
       - run: make testacc
-        env:
-          KANEO_TEST_LOG_DIR: ${{ runner.temp }}/kaneo-logs
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: kaneo-${{ matrix.kaneo-version }}-logs
-          path: ${{ runner.temp }}/kaneo-logs
+          path: _artifacts
           if-no-files-found: ignore
