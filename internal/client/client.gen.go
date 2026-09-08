@@ -535,6 +535,23 @@ type Activity struct {
 	UserId    nullable.Nullable[string] `json:"userId"`
 }
 
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"emailVerified"`
+	Id            string `json:"id"`
+	Name          string `json:"name"`
+	Role          string `json:"role"`
+}
+
+// AdminUserData defines model for AdminUserData.
+type AdminUserData struct {
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"emailVerified"`
+	Name          string `json:"name"`
+	Role          string `json:"role"`
+}
+
 // Board defines model for Board.
 type Board struct {
 	ArchivedTasks []BoardTask               `json:"archivedTasks"`
@@ -1620,6 +1637,38 @@ type CreateActivityJSONBody struct {
 	Type string `json:"type"`
 }
 
+// CreateAdminUserJSONBody defines parameters for CreateAdminUser.
+type CreateAdminUserJSONBody struct {
+	Data struct {
+		EmailVerified bool `json:"emailVerified"`
+	} `json:"data"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Role  string `json:"role"`
+}
+
+// GetAdminUserParams defines parameters for GetAdminUser.
+type GetAdminUserParams struct {
+	Id string `form:"id" json:"id"`
+}
+
+// RemoveAdminUserJSONBody defines parameters for RemoveAdminUser.
+type RemoveAdminUserJSONBody struct {
+	UserId string `json:"userId"`
+}
+
+// SetAdminUserPasswordJSONBody defines parameters for SetAdminUserPassword.
+type SetAdminUserPasswordJSONBody struct {
+	NewPassword string `json:"newPassword"`
+	UserId      string `json:"userId"`
+}
+
+// UpdateAdminUserJSONBody defines parameters for UpdateAdminUser.
+type UpdateAdminUserJSONBody struct {
+	Data   AdminUserData `json:"data"`
+	UserId string        `json:"userId"`
+}
+
 // GetDeviceAuthorizationPageParams defines parameters for GetDeviceAuthorizationPage.
 type GetDeviceAuthorizationPageParams struct {
 	// UserCode The device authorization user code.
@@ -2534,6 +2583,18 @@ type UpdateCommentJSONRequestBody UpdateCommentJSONBody
 // CreateActivityJSONRequestBody defines body for CreateActivity for application/json ContentType.
 type CreateActivityJSONRequestBody CreateActivityJSONBody
 
+// CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
+type CreateAdminUserJSONRequestBody CreateAdminUserJSONBody
+
+// RemoveAdminUserJSONRequestBody defines body for RemoveAdminUser for application/json ContentType.
+type RemoveAdminUserJSONRequestBody RemoveAdminUserJSONBody
+
+// SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
+type SetAdminUserPasswordJSONRequestBody SetAdminUserPasswordJSONBody
+
+// UpdateAdminUserJSONRequestBody defines body for UpdateAdminUser for application/json ContentType.
+type UpdateAdminUserJSONRequestBody UpdateAdminUserJSONBody
+
 // AcceptOrganizationInvitationJSONRequestBody defines body for AcceptOrganizationInvitation for application/json ContentType.
 type AcceptOrganizationInvitationJSONRequestBody AcceptOrganizationInvitationJSONBody
 
@@ -3302,6 +3363,41 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /asset/{id} (the `GetAsset` operationId).
 	GetAsset(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAdminUserWithBody performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	CreateAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAdminUser performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type.
+	CreateAdminUser(ctx context.Context, body CreateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAdminUser performs a GET /auth/admin/get-user (the `GetAdminUser` operationId) request.
+	GetAdminUser(ctx context.Context, params *GetAdminUserParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveAdminUserWithBody performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	RemoveAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveAdminUser performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type.
+	RemoveAdminUser(ctx context.Context, body RemoveAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAdminUserPasswordWithBody performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request,
+	// with any type of body and a specified content type.
+	SetAdminUserPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAdminUserPassword performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request.
+	// Takes a body of the `application/json` content type.
+	SetAdminUserPassword(ctx context.Context, body SetAdminUserPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAdminUserWithBody performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	UpdateAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAdminUser performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type.
+	UpdateAdminUser(ctx context.Context, body UpdateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDeviceAuthorizationPage Device authorization page
 	//
@@ -5257,6 +5353,131 @@ func (c *Client) GetActivities(ctx context.Context, taskId string, reqEditors ..
 // Corresponds with GET /asset/{id} (the `GetAsset` operationId).
 func (c *Client) GetAsset(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAssetRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAdminUserWithBody performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) CreateAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAdminUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAdminUser performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) CreateAdminUser(ctx context.Context, body CreateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAdminUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAdminUser performs a GET /auth/admin/get-user (the `GetAdminUser` operationId) request.
+func (c *Client) GetAdminUser(ctx context.Context, params *GetAdminUserParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAdminUserRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveAdminUserWithBody performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) RemoveAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveAdminUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveAdminUser performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) RemoveAdminUser(ctx context.Context, body RemoveAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveAdminUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAdminUserPasswordWithBody performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) SetAdminUserPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAdminUserPasswordRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAdminUserPassword performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) SetAdminUserPassword(ctx context.Context, body SetAdminUserPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAdminUserPasswordRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAdminUserWithBody performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) UpdateAdminUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAdminUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAdminUser performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) UpdateAdminUser(ctx context.Context, body UpdateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAdminUserRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9438,6 +9659,216 @@ func NewGetAssetRequest(server string, id string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewCreateAdminUserRequest calls the generic CreateAdminUser builder with application/json body
+func NewCreateAdminUserRequest(server string, body CreateAdminUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAdminUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateAdminUserRequestWithBody constructs an http.Request for the CreateAdminUser method, with any body, and a specified content type
+func NewCreateAdminUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/admin/create-user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAdminUserRequest constructs an http.Request for the GetAdminUser method
+func NewGetAdminUserRequest(server string, params *GetAdminUserParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/admin/get-user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "id", params.Id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRemoveAdminUserRequest calls the generic RemoveAdminUser builder with application/json body
+func NewRemoveAdminUserRequest(server string, body RemoveAdminUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRemoveAdminUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewRemoveAdminUserRequestWithBody constructs an http.Request for the RemoveAdminUser method, with any body, and a specified content type
+func NewRemoveAdminUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/admin/remove-user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSetAdminUserPasswordRequest calls the generic SetAdminUserPassword builder with application/json body
+func NewSetAdminUserPasswordRequest(server string, body SetAdminUserPasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetAdminUserPasswordRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetAdminUserPasswordRequestWithBody constructs an http.Request for the SetAdminUserPassword method, with any body, and a specified content type
+func NewSetAdminUserPasswordRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/admin/set-user-password")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAdminUserRequest calls the generic UpdateAdminUser builder with application/json body
+func NewUpdateAdminUserRequest(server string, body UpdateAdminUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAdminUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateAdminUserRequestWithBody constructs an http.Request for the UpdateAdminUser method, with any body, and a specified content type
+func NewUpdateAdminUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/admin/update-user")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -15355,6 +15786,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /asset/{id} (the `GetAsset` operationId).
 	GetAssetWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAssetResponse, error)
 
+	// CreateAdminUserWithBodyWithResponse performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	CreateAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAdminUserResponse, error)
+
+	// CreateAdminUserWithResponse performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	CreateAdminUserWithResponse(ctx context.Context, body CreateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAdminUserResponse, error)
+
+	// GetAdminUserWithResponse performs a GET /auth/admin/get-user (the `GetAdminUser` operationId) request.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetAdminUserWithResponse(ctx context.Context, params *GetAdminUserParams, reqEditors ...RequestEditorFn) (*GetAdminUserResponse, error)
+
+	// RemoveAdminUserWithBodyWithResponse performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	RemoveAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RemoveAdminUserResponse, error)
+
+	// RemoveAdminUserWithResponse performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	RemoveAdminUserWithResponse(ctx context.Context, body RemoveAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*RemoveAdminUserResponse, error)
+
+	// SetAdminUserPasswordWithBodyWithResponse performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	SetAdminUserPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAdminUserPasswordResponse, error)
+
+	// SetAdminUserPasswordWithResponse performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	SetAdminUserPasswordWithResponse(ctx context.Context, body SetAdminUserPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAdminUserPasswordResponse, error)
+
+	// UpdateAdminUserWithBodyWithResponse performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	UpdateAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAdminUserResponse, error)
+
+	// UpdateAdminUserWithResponse performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	UpdateAdminUserWithResponse(ctx context.Context, body UpdateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAdminUserResponse, error)
+
 	// GetDeviceAuthorizationPageWithResponse Device authorization page
 	//
 	// Better Auth serves this as JSON. A top-level browser navigation is redirected to the web app's device screen instead, so opening the URL by hand shows a page rather than a JSON blob.
@@ -17508,6 +17984,223 @@ func (r GetAssetResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetAssetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateAdminUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		User AdminUser `json:"user"`
+	}
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateAdminUserResponse) GetJSON200() *struct {
+	User AdminUser `json:"user"`
+} {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateAdminUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAdminUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAdminUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAdminUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAdminUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AdminUser
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAdminUserResponse) GetJSON200() *AdminUser {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAdminUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAdminUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAdminUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAdminUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RemoveAdminUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Success bool `json:"success"`
+	}
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RemoveAdminUserResponse) GetJSON200() *struct {
+	Success bool `json:"success"`
+} {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r RemoveAdminUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveAdminUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveAdminUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RemoveAdminUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetAdminUserPasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Status bool `json:"status"`
+	}
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetAdminUserPasswordResponse) GetJSON200() *struct {
+	Status bool `json:"status"`
+} {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r SetAdminUserPasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetAdminUserPasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetAdminUserPasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetAdminUserPasswordResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateAdminUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AdminUser
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateAdminUserResponse) GetJSON200() *AdminUser {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateAdminUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAdminUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAdminUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateAdminUserResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -23825,6 +24518,105 @@ func (c *ClientWithResponses) GetAssetWithResponse(ctx context.Context, id strin
 	return ParseGetAssetResponse(rsp)
 }
 
+// CreateAdminUserWithBodyWithResponse performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAdminUserResponse, error) {
+	rsp, err := c.CreateAdminUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAdminUserResponse(rsp)
+}
+
+// CreateAdminUserWithResponse performs a POST /auth/admin/create-user (the `CreateAdminUser` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) CreateAdminUserWithResponse(ctx context.Context, body CreateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAdminUserResponse, error) {
+	rsp, err := c.CreateAdminUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAdminUserResponse(rsp)
+}
+
+// GetAdminUserWithResponse performs a GET /auth/admin/get-user (the `GetAdminUser` operationId) request.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetAdminUserWithResponse(ctx context.Context, params *GetAdminUserParams, reqEditors ...RequestEditorFn) (*GetAdminUserResponse, error) {
+	rsp, err := c.GetAdminUser(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAdminUserResponse(rsp)
+}
+
+// RemoveAdminUserWithBodyWithResponse performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RemoveAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RemoveAdminUserResponse, error) {
+	rsp, err := c.RemoveAdminUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveAdminUserResponse(rsp)
+}
+
+// RemoveAdminUserWithResponse performs a POST /auth/admin/remove-user (the `RemoveAdminUser` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RemoveAdminUserWithResponse(ctx context.Context, body RemoveAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*RemoveAdminUserResponse, error) {
+	rsp, err := c.RemoveAdminUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveAdminUserResponse(rsp)
+}
+
+// SetAdminUserPasswordWithBodyWithResponse performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) SetAdminUserPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAdminUserPasswordResponse, error) {
+	rsp, err := c.SetAdminUserPasswordWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAdminUserPasswordResponse(rsp)
+}
+
+// SetAdminUserPasswordWithResponse performs a POST /auth/admin/set-user-password (the `SetAdminUserPassword` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) SetAdminUserPasswordWithResponse(ctx context.Context, body SetAdminUserPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAdminUserPasswordResponse, error) {
+	rsp, err := c.SetAdminUserPassword(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAdminUserPasswordResponse(rsp)
+}
+
+// UpdateAdminUserWithBodyWithResponse performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UpdateAdminUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAdminUserResponse, error) {
+	rsp, err := c.UpdateAdminUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAdminUserResponse(rsp)
+}
+
+// UpdateAdminUserWithResponse performs a POST /auth/admin/update-user (the `UpdateAdminUser` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UpdateAdminUserWithResponse(ctx context.Context, body UpdateAdminUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAdminUserResponse, error) {
+	rsp, err := c.UpdateAdminUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAdminUserResponse(rsp)
+}
+
 // GetDeviceAuthorizationPageWithResponse Device authorization page
 //
 // Better Auth serves this as JSON. A top-level browser navigation is redirected to the web app's device screen instead, so opening the URL by hand shows a page rather than a JSON blob.
@@ -27202,6 +27994,142 @@ func ParseGetAssetResponse(rsp *http.Response) (*GetAssetResponse, error) {
 	response := &GetAssetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseCreateAdminUserResponse parses an HTTP response from a CreateAdminUserWithResponse call
+func ParseCreateAdminUserResponse(rsp *http.Response) (*CreateAdminUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAdminUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			User AdminUser `json:"user"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAdminUserResponse parses an HTTP response from a GetAdminUserWithResponse call
+func ParseGetAdminUserResponse(rsp *http.Response) (*GetAdminUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAdminUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AdminUser
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveAdminUserResponse parses an HTTP response from a RemoveAdminUserWithResponse call
+func ParseRemoveAdminUserResponse(rsp *http.Response) (*RemoveAdminUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveAdminUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Success bool `json:"success"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetAdminUserPasswordResponse parses an HTTP response from a SetAdminUserPasswordWithResponse call
+func ParseSetAdminUserPasswordResponse(rsp *http.Response) (*SetAdminUserPasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetAdminUserPasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Status bool `json:"status"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAdminUserResponse parses an HTTP response from a UpdateAdminUserWithResponse call
+func ParseUpdateAdminUserResponse(rsp *http.Response) (*UpdateAdminUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAdminUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AdminUser
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	}
 
 	return response, nil
