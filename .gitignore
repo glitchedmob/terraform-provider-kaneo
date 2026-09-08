@@ -12,6 +12,7 @@ crash.*.log
 
 # Go
 coverage.out
+_artifacts/
 
 # Editors and operating systems
 .idea/

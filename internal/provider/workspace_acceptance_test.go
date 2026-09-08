@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -15,7 +15,7 @@ import (
 
 func TestAccWorkspaceLifecycle(t *testing.T) {
 	api := newAcceptanceAPI(t)
-	slug := "terraform-" + uuid.NewString()
+	slug := "terraform-" + uuid.NewV4().String()
 	const address = "kaneo_workspace.test"
 	config := func(name, slug, optional string) string {
 		return api.providerConfig() + fmt.Sprintf(`
@@ -101,7 +101,7 @@ resource "kaneo_workspace" "test" {
   name = "Terraform Drift"
   slug = %q
 }
-`, "terraform-"+uuid.NewString())
+`, "terraform-"+uuid.NewV4().String())
 	var originalID string
 
 	resource.Test(t, resource.TestCase{

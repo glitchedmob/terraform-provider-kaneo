@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -43,8 +43,8 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 	}
 	api := &acceptanceAPI{endpoint: endpoint, client: &http.Client{Jar: jar, Timeout: 30 * time.Second}}
 	if err := api.request(http.MethodPost, "/auth/sign-up/email", map[string]string{
-		"name": "Terraform Acceptance", "email": "terraform-" + uuid.NewString() + "@example.com",
-		"password": uuid.NewString(),
+		"name": "Terraform Acceptance", "email": "terraform-" + uuid.NewV4().String() + "@example.com",
+		"password": uuid.NewV4().String(),
 	}, nil); err != nil {
 		t.Fatalf("create test user: %s", err)
 	}
