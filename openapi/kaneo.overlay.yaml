@@ -1,0 +1,14 @@
+overlay: 1.0.0
+info:
+  title: Kaneo client generation fixes
+  version: 1.0.0
+actions:
+  - target: $.paths['/notification'].post.responses['200'].content['application/json'].schema.allOf
+    description: Remove the invalid intersection used to express a nullable response.
+    remove: true
+  - target: $.paths['/notification'].post.responses['200'].content['application/json'].schema
+    description: Express the nullable notification response as a union.
+    update:
+      anyOf:
+        - $ref: '#/components/schemas/Notification'
+        - type: 'null'

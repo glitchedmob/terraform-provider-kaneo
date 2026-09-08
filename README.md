@@ -14,9 +14,12 @@ This repository contains the initial scaffold for the Kaneo Terraform provider. 
 ```shell
 git clone git@github.com:glitchedmob/terraform-provider-kaneo.git
 cd terraform-provider-kaneo
+make generate
 make test
 make build
 ```
+
+The generated Go client in `internal/client/client.gen.go` is committed to the repository. Run `make generate` after updating `openapi/kaneo.openapi.json`.
 
 ## License
 

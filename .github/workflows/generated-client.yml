@@ -1,0 +1,21 @@
+name: Generated Client
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  generated-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: make generate
+      - name: Check generated source
+        run: git diff --exit-code
