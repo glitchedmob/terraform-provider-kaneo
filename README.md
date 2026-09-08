@@ -19,6 +19,7 @@ Set `KANEO_USERNAME` to an existing Kaneo account's email address and `KANEO_PAS
 - [Workspace resource](docs/resources/workspace.md) and [data source](docs/data-sources/workspace.md)
 - [Workspace role resource](docs/resources/workspace_role.md), manages dynamic role names and permission sets with actual workspace authorization
 - [Workspace member resource](docs/resources/workspace_member.md), invites without waiting for acceptance, then manages the accepted member's role and removal. Requires lowercase email; fails closed at Kaneo's 100 stored-invitation listing cap.
+- [Team resource](docs/resources/team.md), manages workspace-scoped teams by native ID; Kaneo prohibits deleting the last team
 - [Project resource](docs/resources/project.md) and [data source](docs/data-sources/project.md)
 - [Column resource](docs/resources/column.md) and [data source](docs/data-sources/column.md)
 - [Task resource](docs/resources/task.md) and [data source](docs/data-sources/task.md)
