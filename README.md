@@ -17,6 +17,7 @@ Set `KANEO_USERNAME` to an existing Kaneo account's email address and `KANEO_PAS
 
 - [User resource](docs/resources/user.md), requires instance admin access and does not add workspace membership
 - [Workspace resource](docs/resources/workspace.md) and [data source](docs/data-sources/workspace.md)
+- [Workspace role resource](docs/resources/workspace_role.md), manages dynamic role names and permission sets with actual workspace authorization
 - [Project resource](docs/resources/project.md) and [data source](docs/data-sources/project.md)
 - [Column resource](docs/resources/column.md) and [data source](docs/data-sources/column.md)
 - [Task resource](docs/resources/task.md) and [data source](docs/data-sources/task.md)
