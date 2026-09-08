@@ -11,23 +11,7 @@ Each resource page gives its import ID format. Example IDs are placeholders; rep
 
 Use `terraform import ADDRESS ID`, or a declarative import block with Terraform 1.5 or later. For example, adopt a default column in an existing project:
 
-```terraform
-data "kaneo_column" "todo" {
-  project_id = "existing-project-id"
-  slug       = "to-do"
-}
-
-resource "kaneo_column" "todo" {
-  project_id = data.kaneo_column.todo.project_id
-  name       = "To Do"
-  is_final   = false
-}
-
-import {
-  to = kaneo_column.todo
-  id = "${data.kaneo_column.todo.project_id}/${data.kaneo_column.todo.id}"
-}
-```
+{{ tffile "examples/guides/import/main.tf" }}
 
 Create the project first so import IDs are known during planning. Set `is_final = true` for the default Done column. See [column defaults and import formats](https://registry.terraform.io/providers/glitchedmob/kaneo/latest/docs/resources/column#import-and-default-columns).
 

@@ -60,7 +60,7 @@ func (d *columnDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				MarkdownDescription: "Whether the column marks tasks as done and stops their overdue reminders.", Computed: true,
 			},
 			"position": schema.Int64Attribute{
-				MarkdownDescription: "Absolute board position.", Computed: true,
+				MarkdownDescription: "Absolute board position as an integer.", Computed: true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Column creation timestamp.", Computed: true,

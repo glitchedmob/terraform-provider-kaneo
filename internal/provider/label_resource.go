@@ -39,10 +39,10 @@ func (r *labelResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 		Attributes: map[string]schema.Attribute{
 			"id":           schema.StringAttribute{MarkdownDescription: "Workspace label identifier, not a task-copy ID.", Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"workspace_id": schema.StringAttribute{MarkdownDescription: "Workspace identifier. Changing this replaces the label and deletes matching copies in the previous workspace.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"name":         schema.StringAttribute{MarkdownDescription: "Label name, unique among workspace-level labels in this workspace.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
-			"color":        schema.StringAttribute{MarkdownDescription: "Label color, for example #ef4444. Passed through to Kaneo without normalization.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
-			"created_at":   schema.StringAttribute{MarkdownDescription: "Label creation timestamp.", Computed: true},
-			"updated_at":   schema.StringAttribute{MarkdownDescription: "Label last update timestamp.", Computed: true},
+			"name":         schema.StringAttribute{MarkdownDescription: "Non-empty label name, unique among workspace-level labels in this workspace.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"color":        schema.StringAttribute{MarkdownDescription: "Non-empty color string, for example `#ef4444`. Passed through to Kaneo without normalization.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"created_at":   schema.StringAttribute{MarkdownDescription: "Label creation timestamp in RFC3339 format.", Computed: true},
+			"updated_at":   schema.StringAttribute{MarkdownDescription: "Label last update timestamp in RFC3339 format.", Computed: true},
 		},
 	}
 }

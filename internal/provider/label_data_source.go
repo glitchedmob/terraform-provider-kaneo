@@ -31,12 +31,12 @@ func (d *labelDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Retrieves a workspace-level label by ID. Task-specific label copies are not accepted.",
 		Attributes: map[string]schema.Attribute{
-			"id":           schema.StringAttribute{MarkdownDescription: "Workspace label identifier.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"id":           schema.StringAttribute{MarkdownDescription: "Non-empty workspace-level label identifier, not a task-copy ID.", Required: true, Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
 			"workspace_id": schema.StringAttribute{MarkdownDescription: "Workspace identifier.", Computed: true},
 			"name":         schema.StringAttribute{MarkdownDescription: "Label name.", Computed: true},
 			"color":        schema.StringAttribute{MarkdownDescription: "Label color.", Computed: true},
-			"created_at":   schema.StringAttribute{MarkdownDescription: "Label creation timestamp.", Computed: true},
-			"updated_at":   schema.StringAttribute{MarkdownDescription: "Label last update timestamp.", Computed: true},
+			"created_at":   schema.StringAttribute{MarkdownDescription: "Label creation timestamp in RFC3339 format.", Computed: true},
+			"updated_at":   schema.StringAttribute{MarkdownDescription: "Label last update timestamp in RFC3339 format.", Computed: true},
 		},
 	}
 }

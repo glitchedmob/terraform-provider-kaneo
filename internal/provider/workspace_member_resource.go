@@ -43,13 +43,13 @@ func (r *workspaceMemberResource) Metadata(_ context.Context, req resource.Metad
 }
 func (r *workspaceMemberResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{MarkdownDescription: "Manages a pending workspace invitation and its accepted membership. Create returns without waiting for recipient acceptance. Requires workspace membership and invitation/member permissions.", Attributes: map[string]schema.Attribute{
-		"id":            schema.StringAttribute{Computed: true, MarkdownDescription: "Stable percent-escaped workspace_id/email identity.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+		"id":            schema.StringAttribute{Computed: true, MarkdownDescription: "Stable `workspace_id/email` identity, with each part URL path-escaped.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 		"workspace_id":  schema.StringAttribute{Required: true, MarkdownDescription: "Workspace ID. Changes require replacement.", Validators: []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^\S+$`), "must be nonempty without whitespace")}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-		"email":         schema.StringAttribute{Required: true, MarkdownDescription: "Canonical lowercase email. Changes require replacement.", Validators: []validator.String{memberEmailValidator{}}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-		"role":          schema.StringAttribute{Required: true, MarkdownDescription: "One role name, including custom workspace role names. Comma-separated multi-role assignments are not supported.", Validators: []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^[^,\s]+$`), "must be a nonempty role name without commas or whitespace")}},
+		"email":         schema.StringAttribute{Required: true, MarkdownDescription: "Canonical lowercase email without whitespace or a display name. Changes replace the resource. Mixed-case configuration is rejected, not silently rewritten. If referencing a mixed-case `kaneo_user.email`, use `lower(kaneo_user.recipient.email)` explicitly.", Validators: []validator.String{memberEmailValidator{}}, PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+		"role":          schema.StringAttribute{Required: true, MarkdownDescription: "Single, nonempty role name without whitespace or commas. Supports custom names and built-in roles. Kaneo validates role existence. Multi-role assignments are rejected during discovery and import rather than selecting one role or silently overwriting the others.", Validators: []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^[^,\s]+$`), "must be a nonempty role name without commas or whitespace")}},
 		"status":        schema.StringAttribute{Computed: true, MarkdownDescription: "Observed pending or accepted status."},
 		"member_id":     schema.StringAttribute{Computed: true, MarkdownDescription: "Accepted native member ID, or null while pending."},
-		"invitation_id": schema.StringAttribute{Computed: true, MarkdownDescription: "Live pending invitation ID, or null when none is outstanding."},
+		"invitation_id": schema.StringAttribute{Computed: true, MarkdownDescription: "Live pending invitation ID, or null when none is outstanding. A pending invitation can coexist with a member; destroy cleans up both."},
 	}}
 }
 

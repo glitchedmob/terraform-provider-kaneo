@@ -32,7 +32,7 @@ func (d *taskDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		MarkdownDescription: "Retrieves a Kaneo task by its task ID, including planned and archived tasks.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Task identifier, not the displayed project-slug/number identifier.", Required: true,
+				MarkdownDescription: "Non-empty task identifier, not a displayed identifier such as `PLAT-12`.", Required: true,
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"project_id":  schema.StringAttribute{MarkdownDescription: "Project identifier.", Computed: true},
@@ -43,8 +43,8 @@ func (d *taskDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"assignee_id": schema.StringAttribute{MarkdownDescription: "Assignee user ID, or null if unassigned.", Computed: true},
 			"start_date":  schema.StringAttribute{MarkdownDescription: "Start timestamp in RFC3339 format, or null if unset.", Computed: true},
 			"due_date":    schema.StringAttribute{MarkdownDescription: "Due timestamp in RFC3339 format, or null if unset.", Computed: true},
-			"number":      schema.Int64Attribute{MarkdownDescription: "API-assigned per-project task number.", Computed: true},
-			"position":    schema.Int64Attribute{MarkdownDescription: "Order within the column.", Computed: true},
+			"number":      schema.Int64Attribute{MarkdownDescription: "API-assigned per-project task number. May be null for legacy tasks.", Computed: true},
+			"position":    schema.Int64Attribute{MarkdownDescription: "Order within the column. May be null for legacy tasks.", Computed: true},
 			"created_at":  schema.StringAttribute{MarkdownDescription: "Task creation timestamp.", Computed: true},
 		},
 	}
