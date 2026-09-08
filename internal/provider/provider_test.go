@@ -68,29 +68,34 @@ func TestProviderConfigure(t *testing.T) {
 	}
 }
 
-func TestProviderRegistersWorkspaceTypes(t *testing.T) {
+func TestProviderRegistersTypes(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	p := New("test")()
 	resources := p.Resources(ctx)
-	if len(resources) != 1 {
-		t.Fatalf("expected one resource registration, got %d", len(resources))
+	want := []string{"kaneo_workspace", "kaneo_project"}
+	if len(resources) != len(want) {
+		t.Fatalf("expected %d resource registrations, got %d", len(want), len(resources))
 	}
-	resourceMetadata := &resource.MetadataResponse{}
-	resources[0]().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "kaneo"}, resourceMetadata)
-	if resourceMetadata.TypeName != "kaneo_workspace" {
-		t.Fatalf("expected workspace resource, got %q", resourceMetadata.TypeName)
+	for i, name := range want {
+		metadata := &resource.MetadataResponse{}
+		resources[i]().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "kaneo"}, metadata)
+		if metadata.TypeName != name {
+			t.Fatalf("expected resource %q, got %q", name, metadata.TypeName)
+		}
 	}
 
 	dataSources := p.DataSources(ctx)
-	if len(dataSources) != 1 {
-		t.Fatalf("expected one data source registration, got %d", len(dataSources))
+	if len(dataSources) != len(want) {
+		t.Fatalf("expected %d data source registrations, got %d", len(want), len(dataSources))
 	}
-	dataSourceMetadata := &datasource.MetadataResponse{}
-	dataSources[0]().Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "kaneo"}, dataSourceMetadata)
-	if dataSourceMetadata.TypeName != "kaneo_workspace" {
-		t.Fatalf("expected workspace data source, got %q", dataSourceMetadata.TypeName)
+	for i, name := range want {
+		metadata := &datasource.MetadataResponse{}
+		dataSources[i]().Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "kaneo"}, metadata)
+		if metadata.TypeName != name {
+			t.Fatalf("expected data source %q, got %q", name, metadata.TypeName)
+		}
 	}
 }
 

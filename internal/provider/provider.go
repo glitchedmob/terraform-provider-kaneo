@@ -95,12 +95,14 @@ func (p *KaneoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 func (p *KaneoProvider) Resources(context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		newWorkspaceResource,
+		newProjectResource,
 	}
 }
 
 func (p *KaneoProvider) DataSources(context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		newWorkspaceDataSource,
+		newProjectDataSource,
 	}
 }
 
