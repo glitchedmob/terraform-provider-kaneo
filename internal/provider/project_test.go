@@ -3,14 +3,11 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
-	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -18,51 +15,6 @@ import (
 )
 
 const projectFixture = `{"id":"project-1","workspaceId":"workspace-1","name":"Engineering","slug":"ENG","icon":"Layout","description":null,"isPublic":false,"createdAt":"2026-09-01T12:00:00Z","archivedAt":null,"position":0,"lastTaskNumber":0}`
-
-func projectTestClient(t *testing.T, handler http.HandlerFunc) *kaneoclient.ClientWithResponses {
-	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if handleTestSignIn(t, w, r) {
-			return
-		}
-		if r.Header.Get("Authorization") != "Bearer test-session" {
-			t.Error("missing session token")
-		}
-		w.Header().Set("Content-Type", "application/json")
-		handler(w, r)
-	}))
-	t.Cleanup(server.Close)
-	client, err := newAPIClient(t.Context(), server.URL, "test@example.com", " test-password ", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return client
-}
-
-func projectTestPlan(t *testing.T, r *projectResource, model projectModel) tfsdk.Plan {
-	t.Helper()
-	var response resource.SchemaResponse
-	r.Schema(t.Context(), resource.SchemaRequest{}, &response)
-	if response.Diagnostics.HasError() {
-		t.Fatal(response.Diagnostics)
-	}
-	plan := tfsdk.Plan{Schema: response.Schema}
-	if diags := plan.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return plan
-}
-
-func projectTestConfig(t *testing.T, d *projectDataSource, model projectModel) tfsdk.Config {
-	t.Helper()
-	var response datasource.SchemaResponse
-	d.Schema(t.Context(), datasource.SchemaRequest{}, &response)
-	state := tfsdk.State{Schema: response.Schema}
-	if diags := state.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return tfsdk.Config{Schema: response.Schema, Raw: state.Raw}
-}
 
 func projectTestModel() projectModel {
 	return projectModel{
@@ -73,17 +25,15 @@ func projectTestModel() projectModel {
 
 func TestProjectResourceLifecycle(t *testing.T) {
 	var remote map[string]any
-	if err := json.Unmarshal([]byte(projectFixture), &remote); err != nil {
-		t.Fatal(err)
-	}
+	testFixture(t, projectFixture, &remote)
 	var calls []string
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.Path)
 		switch r.Method {
 		case http.MethodPost:
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			for _, field := range []string{"workspaceId", "name", "slug", "icon"} {
 				if body[field] != remote[field] {
@@ -95,8 +45,8 @@ func TestProjectResourceLifecycle(t *testing.T) {
 			}
 		case http.MethodPut:
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			for _, field := range []string{"name", "slug", "icon", "description", "isPublic"} {
 				value, ok := body[field]
@@ -106,15 +56,13 @@ func TestProjectResourceLifecycle(t *testing.T) {
 				remote[field] = value
 			}
 		}
-		if err := json.NewEncoder(w).Encode(remote); err != nil {
-			t.Error(err)
-		}
+		testEncodeResponse(t, w, remote)
 	})
 	r := &projectResource{client: client}
 	model := projectTestModel()
 	model.Description = types.StringValue("Created description")
 	model.IsPublic = types.BoolValue(true)
-	plan := projectTestPlan(t, r, model)
+	plan := testPlan(t, r, model)
 	create := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &create)
 	if create.Diagnostics.HasError() {
@@ -137,7 +85,7 @@ func TestProjectResourceLifecycle(t *testing.T) {
 	state.Description = types.StringValue("")
 	state.IsPublic = types.BoolValue(false)
 	update := resource.UpdateResponse{State: create.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: projectTestPlan(t, r, state)}, &update)
+	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, state)}, &update)
 	if update.Diagnostics.HasError() {
 		t.Fatal(update.Diagnostics)
 	}
@@ -145,10 +93,7 @@ func TestProjectResourceLifecycle(t *testing.T) {
 		t.Fatalf("update did not send cleared values: %v", remote)
 	}
 
-	imported := resource.ImportStateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	if diags := imported.State.Set(t.Context(), projectModel{}); diags.HasError() {
-		t.Fatal(diags)
-	}
+	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, projectModel{}))}
 	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "project-1"}, &imported)
 	if imported.Diagnostics.HasError() {
 		t.Fatal(imported.Diagnostics)
@@ -177,7 +122,7 @@ func TestProjectResourceLifecycle(t *testing.T) {
 }
 
 func TestProjectCreatePartialFailure(t *testing.T) {
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			if _, err := fmt.Fprint(w, projectFixture); err != nil {
 				t.Error(err)
@@ -192,7 +137,7 @@ func TestProjectCreatePartialFailure(t *testing.T) {
 	r := &projectResource{client: client}
 	model := projectTestModel()
 	model.Description = types.StringValue("Needs a second request")
-	plan := projectTestPlan(t, r, model)
+	plan := testPlan(t, r, model)
 	response := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
 	if !response.Diagnostics.HasError() {
@@ -227,7 +172,7 @@ func TestProjectMissingAndErrors(t *testing.T) {
 		{"listInvalidProject", 400, 200, `[{}]`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/project" {
 					if r.URL.Query().Get("workspaceId") != "workspace-1" || r.URL.Query().Get("includeArchived") != "true" {
 						t.Errorf("unexpected list query: %s", r.URL.RawQuery)
@@ -246,7 +191,7 @@ func TestProjectMissingAndErrors(t *testing.T) {
 			r := &projectResource{client: client}
 			model := projectTestModel()
 			model.ID = types.StringValue("project-1")
-			plan := projectTestPlan(t, r, model)
+			plan := testPlan(t, r, model)
 			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
@@ -269,7 +214,7 @@ func TestProjectDataSourceLookups(t *testing.T) {
 	for _, byID := range []bool{true, false} {
 		t.Run(fmt.Sprintf("byID=%t", byID), func(t *testing.T) {
 			archived := strings.Replace(projectFixture, `"archivedAt":null`, `"archivedAt":"2026-09-02T12:00:00Z"`, 1)
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/project" {
 					if byID {
 						t.Error("ID lookup must not list projects")
@@ -297,7 +242,7 @@ func TestProjectDataSourceLookups(t *testing.T) {
 				model.WorkspaceID = types.StringValue("workspace-1")
 				model.Slug = types.StringValue("ENG")
 			}
-			config := projectTestConfig(t, d, model)
+			config := testConfig(t, d, model)
 			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &response)
 			if response.Diagnostics.HasError() {
@@ -330,7 +275,7 @@ func TestProjectDataSourceErrors(t *testing.T) {
 		{"invalidProject", `{}`, 200, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.status)
 				if _, err := fmt.Fprint(w, tc.body); err != nil {
 					t.Error(err)
@@ -341,7 +286,7 @@ func TestProjectDataSourceErrors(t *testing.T) {
 			if tc.byID {
 				model = projectModel{ID: types.StringValue("project-1")}
 			}
-			config := projectTestConfig(t, d, model)
+			config := testConfig(t, d, model)
 			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &response)
 			if !response.Diagnostics.HasError() {
@@ -369,7 +314,7 @@ func TestProjectDataSourceValidators(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := &projectDataSource{}
-			config := projectTestConfig(t, d, projectModel{ID: tc.id, WorkspaceID: tc.workspace, Slug: tc.slug})
+			config := testConfig(t, d, projectModel{ID: tc.id, WorkspaceID: tc.workspace, Slug: tc.slug})
 			response := datasource.ValidateConfigResponse{}
 			for _, validator := range d.ConfigValidators(t.Context()) {
 				var result datasource.ValidateConfigResponse

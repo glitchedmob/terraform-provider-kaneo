@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -19,41 +18,17 @@ import (
 const labelFixture = `{"id":"label-1","workspaceId":"workspace-1","taskId":null,"name":"Bug","color":"#ef4444","createdAt":"2026-09-01T12:00:00Z","updatedAt":"2026-09-01T12:00:00Z"}`
 const taskLabelFixture = `{"id":"copy-1","workspaceId":"workspace-1","taskId":"task-1","name":"Bug","color":"#ef4444","createdAt":"2026-09-01T12:00:00Z","updatedAt":"2026-09-01T12:00:00Z"}`
 
-func labelTestPlan(t *testing.T, r resource.Resource, model any) tfsdk.Plan {
-	t.Helper()
-	var response resource.SchemaResponse
-	r.Schema(t.Context(), resource.SchemaRequest{}, &response)
-	plan := tfsdk.Plan{Schema: response.Schema}
-	if diags := plan.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return plan
-}
-
 func labelTestAPIValue(t *testing.T, body string) kaneoclient.Label {
 	t.Helper()
 	var label kaneoclient.Label
-	if err := json.Unmarshal([]byte(body), &label); err != nil {
-		t.Fatal(err)
-	}
+	testFixture(t, body, &label)
 	return label
-}
-
-func labelTestConfig(t *testing.T) tfsdk.Config {
-	t.Helper()
-	var response datasource.SchemaResponse
-	(&labelDataSource{}).Schema(t.Context(), datasource.SchemaRequest{}, &response)
-	state := tfsdk.State{Schema: response.Schema}
-	if diags := state.Set(t.Context(), labelModel{ID: types.StringValue("label-1")}); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return tfsdk.Config{Schema: response.Schema, Raw: state.Raw}
 }
 
 func TestLabelLifecycle(t *testing.T) {
 	remote := labelTestAPIValue(t, labelFixture)
 	mutations := 0
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /label/workspace/workspace-1":
 			if _, err := fmt.Fprint(w, "[]"); err != nil {
@@ -62,8 +37,8 @@ func TestLabelLifecycle(t *testing.T) {
 			return
 		case "POST /label", "PUT /label/label-1":
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			if r.Method == http.MethodPost && body["workspaceId"] != "workspace-1" {
 				t.Error("missing workspace")
@@ -80,13 +55,11 @@ func TestLabelLifecycle(t *testing.T) {
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if err := json.NewEncoder(w).Encode(remote); err != nil {
-			t.Error(err)
-		}
+		testEncodeResponse(t, w, remote)
 	})
 	r := &labelResource{client: client}
 	model := labelModelFromAPI(remote)
-	plan := labelTestPlan(t, r, model)
+	plan := testPlan(t, r, model)
 	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 	if created.Diagnostics.HasError() {
@@ -101,7 +74,7 @@ func TestLabelLifecycle(t *testing.T) {
 	}
 	model.Name, model.Color = types.StringValue("Issue"), types.StringValue("#123ABC")
 	updated := resource.UpdateResponse{State: created.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: labelTestPlan(t, r, model), State: created.State}, &updated)
+	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, model), State: created.State}, &updated)
 	if updated.Diagnostics.HasError() {
 		t.Fatal(updated.Diagnostics)
 	}
@@ -111,10 +84,7 @@ func TestLabelLifecycle(t *testing.T) {
 	if got != model {
 		t.Fatalf("updated state=%+v, want %+v", got, model)
 	}
-	imported := resource.ImportStateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	if diags := imported.State.Set(t.Context(), labelModel{}); diags.HasError() {
-		t.Fatal(diags)
-	}
+	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, labelModel{}))}
 	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "label-1"}, &imported)
 	if imported.Diagnostics.HasError() {
 		t.Fatal(imported.Diagnostics)
@@ -130,7 +100,7 @@ func TestLabelLifecycle(t *testing.T) {
 	if got != model {
 		t.Fatalf("import state=%+v, want %+v", got, model)
 	}
-	config := labelTestConfig(t)
+	config := testConfig(t, &labelDataSource{}, labelModel{ID: types.StringValue("label-1")})
 	lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 	(&labelDataSource{client: client}).Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
 	if lookup.Diagnostics.HasError() {
@@ -182,7 +152,7 @@ func TestLabelReadAndDeleteErrors(t *testing.T) {
 		{"taskCopy", 200, strings.Replace(labelFixture, `"taskId":null`, `"taskId":"task-1"`, 1), 0, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodGet {
 					t.Errorf("unexpected mutation: %s", r.Method)
 				}
@@ -204,7 +174,7 @@ func TestLabelReadAndDeleteErrors(t *testing.T) {
 				}
 			})
 			r := &labelResource{client: client}
-			plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
+			plan := testPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
 			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
@@ -221,7 +191,7 @@ func TestLabelReadAndDeleteErrors(t *testing.T) {
 			}
 			// ID-only lookup cannot infer workspace scope, so a different workspace is valid.
 			if tc.name != "wrongWorkspace" {
-				config := labelTestConfig(t)
+				config := testConfig(t, &labelDataSource{}, labelModel{ID: types.StringValue("label-1")})
 				lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 				(&labelDataSource{client: client}).Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
 				if !lookup.Diagnostics.HasError() {
@@ -242,7 +212,7 @@ func TestLabelMutationErrors(t *testing.T) {
 		{200, strings.Replace(labelFixture, `"taskId":null`, `"taskId":"task-1"`, 1)},
 	} {
 		t.Run(fmt.Sprintf("%d/%s", tc.status, tc.body), func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {
 					if strings.Contains(r.URL.Path, "/workspace/") {
 						if _, err := fmt.Fprint(w, "[]"); err != nil {
@@ -261,7 +231,7 @@ func TestLabelMutationErrors(t *testing.T) {
 				}
 			})
 			r := &labelResource{client: client}
-			plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
+			plan := testPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
 			state := tfsdk.State(plan)
 			created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 			r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
@@ -285,7 +255,7 @@ func TestLabelMutationErrors(t *testing.T) {
 }
 
 func TestLabelCollision(t *testing.T) {
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Error("existing label must not be adopted")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -296,7 +266,7 @@ func TestLabelCollision(t *testing.T) {
 		}
 	})
 	r := &labelResource{client: client}
-	plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
+	plan := testPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
 	response := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &response)
 	if !response.Diagnostics.HasError() {

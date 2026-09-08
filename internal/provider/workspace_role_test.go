@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,16 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func roleTestPlan(t *testing.T, model workspaceRoleModel) tfsdk.Plan {
-	t.Helper()
-	var schema resource.SchemaResponse
-	(&workspaceRoleResource{}).Schema(t.Context(), resource.SchemaRequest{}, &schema)
-	plan := tfsdk.Plan{Schema: schema.Schema}
-	if d := plan.Set(t.Context(), model); d.HasError() {
-		t.Fatal(d)
-	}
-	return plan
-}
 func roleTestModel(t *testing.T) workspaceRoleModel {
 	t.Helper()
 	m := workspaceRoleModel{WorkspaceID: types.StringValue("ws")}
@@ -40,15 +29,15 @@ func TestWorkspaceRoleLifecycle(t *testing.T) {
 	model := roleTestModel(t)
 	name := "custom"
 	var renamed bool
-	client := projectTestClient(t, func(w http.ResponseWriter, req *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "GET" {
 			if req.URL.Query().Get("organizationId") != "ws" || req.URL.Query().Get("roleId") != "role-id" {
 				t.Error("missing scoped native IDs")
 			}
 		} else {
 			var body map[string]any
-			if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, req, &body) {
+				return
 			}
 			if body["organizationId"] != "ws" {
 				t.Error("missing explicit workspace")
@@ -85,7 +74,7 @@ func TestWorkspaceRoleLifecycle(t *testing.T) {
 		}
 	})
 	r := &workspaceRoleResource{client: client}
-	plan := roleTestPlan(t, model)
+	plan := testPlan(t, &workspaceRoleResource{}, model)
 	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 	if created.Diagnostics.HasError() {
@@ -100,16 +89,13 @@ func TestWorkspaceRoleLifecycle(t *testing.T) {
 		renamed = newName != "custom"
 		model.Name = types.StringValue(newName)
 		updated := resource.UpdateResponse{State: created.State}
-		r.Update(t.Context(), resource.UpdateRequest{Plan: roleTestPlan(t, model), State: created.State}, &updated)
+		r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, &workspaceRoleResource{}, model), State: created.State}, &updated)
 		if updated.Diagnostics.HasError() {
 			t.Fatal(updated.Diagnostics)
 		}
 		created.State = updated.State
 	}
-	imported := resource.ImportStateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	if d := imported.State.Set(t.Context(), workspaceRoleModel{Permissions: types.MapNull(types.SetType{ElemType: types.StringType})}); d.HasError() {
-		t.Fatal(d)
-	}
+	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, workspaceRoleModel{Permissions: types.MapNull(types.SetType{ElemType: types.StringType})}))}
 	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "ws/role-id"}, &imported)
 	if imported.Diagnostics.HasError() {
 		t.Fatal(imported.Diagnostics)
@@ -151,10 +137,12 @@ func TestWorkspaceRoleAbsenceAndErrors(t *testing.T) {
 		{"wrong workspace", 200, `{"id":"role-id","organizationId":"other"}`, 0, "", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasSuffix(r.URL.Path, "get-full-organization") {
 					if tc.presenceStatus == 0 {
-						t.Fatal("unexpected workspace probe")
+						t.Error("unexpected workspace probe")
+						w.WriteHeader(http.StatusInternalServerError)
+						return
 					}
 					if r.URL.Query().Get("organizationId") != "ws" {
 						t.Error("missing workspace query")
@@ -174,7 +162,7 @@ func TestWorkspaceRoleAbsenceAndErrors(t *testing.T) {
 				}
 			})
 			r := &workspaceRoleResource{client: client}
-			plan := roleTestPlan(t, roleTestModel(t))
+			plan := testPlan(t, &workspaceRoleResource{}, roleTestModel(t))
 			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
@@ -232,7 +220,7 @@ func TestWorkspaceRoleMutationErrors(t *testing.T) {
 			{"malformed", 200, `{}`},
 		} {
 			t.Run(operation+"/"+tc.name, func(t *testing.T) {
-				client := projectTestClient(t, func(w http.ResponseWriter, req *http.Request) {
+				client := testClient(t, func(w http.ResponseWriter, req *http.Request) {
 					if req.Method == "GET" {
 						if strings.HasSuffix(req.URL.Path, "get-full-organization") {
 							if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
@@ -251,7 +239,7 @@ func TestWorkspaceRoleMutationErrors(t *testing.T) {
 					}
 				})
 				r := &workspaceRoleResource{client: client}
-				plan := roleTestPlan(t, roleTestModel(t))
+				plan := testPlan(t, &workspaceRoleResource{}, roleTestModel(t))
 				state := tfsdk.State(plan)
 				switch operation {
 				case "create":

@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,51 +22,25 @@ import (
 const taskFixture = `{"id":"task-1","projectId":"project-1","title":"Testing","description":"Description","status":"testing","priority":"high","userId":"user-1","startDate":"2026-09-01T12:00:00.12Z","dueDate":"2026-09-02T12:00:00.001Z","number":16777217,"position":16777217,"createdAt":"2026-09-01T12:00:00Z"}`
 const emptyTaskBoard = `{"data":{"id":"project-1","columns":[{"tasks":[]}],"archivedTasks":[],"plannedTasks":[]},"pagination":{"page":1,"totalPages":1,"total":0}}`
 
-func taskTestPlan(t *testing.T, model taskModel) tfsdk.Plan {
-	t.Helper()
-	var response resource.SchemaResponse
-	(&taskResource{}).Schema(t.Context(), resource.SchemaRequest{}, &response)
-	plan := tfsdk.Plan{Schema: response.Schema}
-	if diags := plan.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return plan
-}
-
 func taskTestState(t *testing.T) tfsdk.State {
 	t.Helper()
 	var task kaneoclient.Task
-	if err := json.Unmarshal([]byte(taskFixture), &task); err != nil {
-		t.Fatal(err)
-	}
-	plan := taskTestPlan(t, taskModelFromAPI(task, taskModel{}))
+	testFixture(t, taskFixture, &task)
+	plan := testPlan(t, &taskResource{}, taskModelFromAPI(task, taskModel{}))
 	return tfsdk.State(plan)
-}
-
-func taskTestConfig(t *testing.T, model taskModel) tfsdk.Config {
-	t.Helper()
-	var response datasource.SchemaResponse
-	(&taskDataSource{}).Schema(t.Context(), datasource.SchemaRequest{}, &response)
-	state := tfsdk.State{Schema: response.Schema}
-	if diags := state.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return tfsdk.Config{Schema: response.Schema, Raw: state.Raw}
 }
 
 func TestTaskResourceLifecycle(t *testing.T) {
 	var remote map[string]any
-	if err := json.Unmarshal([]byte(taskFixture), &remote); err != nil {
-		t.Fatal(err)
-	}
+	testFixture(t, taskFixture, &remote)
 	var calls []string
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.Path)
 		switch r.Method + " " + r.URL.Path {
 		case "POST /task/project-1", "PUT /task/task-1":
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			for _, field := range []string{"title", "description", "status", "priority"} {
 				value, ok := body[field]
@@ -104,9 +77,7 @@ func TestTaskResourceLifecycle(t *testing.T) {
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if err := json.NewEncoder(w).Encode(remote); err != nil {
-			t.Error(err)
-		}
+		testEncodeResponse(t, w, remote)
 	})
 	r := &taskResource{client: client}
 	var model taskModel
@@ -115,7 +86,7 @@ func TestTaskResourceLifecycle(t *testing.T) {
 		t.Fatal(diags)
 	}
 	model.StartDate = types.StringValue("2026-09-01T08:00:00.120-04:00")
-	plan := taskTestPlan(t, model)
+	plan := testPlan(t, &taskResource{}, model)
 	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 	if created.Diagnostics.HasError() {
@@ -138,7 +109,7 @@ func TestTaskResourceLifecycle(t *testing.T) {
 	model.AssigneeID, model.StartDate, model.DueDate = types.StringNull(), types.StringNull(), types.StringNull()
 	model.Position = types.Int64Unknown()
 	updated := resource.UpdateResponse{State: created.State}
-	r.Update(t.Context(), resource.UpdateRequest{Plan: taskTestPlan(t, model), State: created.State}, &updated)
+	r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, &taskResource{}, model), State: created.State}, &updated)
 	if updated.Diagnostics.HasError() {
 		t.Fatal(updated.Diagnostics)
 	}
@@ -149,10 +120,7 @@ func TestTaskResourceLifecycle(t *testing.T) {
 	if got != model {
 		t.Fatalf("updated state = %+v, want %+v", got, model)
 	}
-	imported := resource.ImportStateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	if diags := imported.State.Set(t.Context(), taskModel{}); diags.HasError() {
-		t.Fatal(diags)
-	}
+	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, taskModel{}))}
 	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "task-1"}, &imported)
 	if imported.Diagnostics.HasError() {
 		t.Fatal(imported.Diagnostics)
@@ -169,7 +137,7 @@ func TestTaskResourceLifecycle(t *testing.T) {
 		t.Fatalf("import state = %+v, want %+v", got, model)
 	}
 	d := &taskDataSource{client: client}
-	config := taskTestConfig(t, taskModel{ID: types.StringValue("task-1")})
+	config := testConfig(t, &taskDataSource{}, taskModel{ID: types.StringValue("task-1")})
 	lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 	d.Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
 	if lookup.Diagnostics.HasError() {
@@ -214,9 +182,7 @@ func TestTaskDateMapping(t *testing.T) {
 		}
 	}
 	var task kaneoclient.Task
-	if err := json.Unmarshal([]byte(`{"id":"task-1","projectId":"project-1","description":null,"position":null,"number":null,"userId":null}`), &task); err != nil {
-		t.Fatal(err)
-	}
+	testFixture(t, `{"id":"task-1","projectId":"project-1","description":null,"position":null,"number":null,"userId":null}`, &task)
 	model := taskModelFromAPI(task, taskModel{})
 	if !model.Position.IsNull() || !model.Number.IsNull() || !model.AssigneeID.IsNull() || !model.StartDate.IsNull() || model.Description.ValueString() != "" {
 		t.Fatalf("unexpected null mapping: %+v", model)
@@ -247,7 +213,7 @@ func TestTaskValidation(t *testing.T) {
 		{name: "trimmedAssignee", assignee: types.StringValue(" user-1 ")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan := taskTestPlan(t, taskModel{StartDate: tc.start, DueDate: tc.due, AssigneeID: tc.assignee})
+			plan := testPlan(t, &taskResource{}, taskModel{StartDate: tc.start, DueDate: tc.due, AssigneeID: tc.assignee})
 			response := resource.ValidateConfigResponse{}
 			(&taskResource{}).ValidateConfig(t.Context(), resource.ValidateConfigRequest{Config: tfsdk.Config(plan)}, &response)
 			if response.Diagnostics.HasError() == tc.valid {
@@ -286,7 +252,7 @@ func TestTaskMutationErrors(t *testing.T) {
 		{200, `null`}, {200, `{}`}, {200, `{`}, {200, strings.Replace(taskFixture, "project-1", "project-2", 1)},
 	} {
 		t.Run(fmt.Sprintf("%d/%s", tc.status, tc.body), func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tc.status)
 				if _, err := fmt.Fprint(w, tc.body); err != nil {
 					t.Error(err)
@@ -298,7 +264,7 @@ func TestTaskMutationErrors(t *testing.T) {
 			if diags := state.Get(t.Context(), &model); diags.HasError() {
 				t.Fatal(diags)
 			}
-			plan := taskTestPlan(t, model)
+			plan := testPlan(t, &taskResource{}, model)
 			created := resource.CreateResponse{State: tfsdk.State{Schema: state.Schema}}
 			r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 			if !created.Diagnostics.HasError() {
@@ -318,11 +284,9 @@ func TestTaskMutationErrors(t *testing.T) {
 		t.Fatal(diags)
 	}
 	model.Position = types.Int64Null()
-	if diags := state.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
+	state = tfsdk.State(testPlan(t, &taskResource{}, model))
 	response := resource.UpdateResponse{State: state}
-	(&taskResource{}).Update(t.Context(), resource.UpdateRequest{Plan: taskTestPlan(t, model), State: state}, &response)
+	(&taskResource{}).Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, &taskResource{}, model), State: state}, &response)
 	if !response.Diagnostics.HasError() {
 		t.Fatal("expected missing position error before making an API call")
 	}
@@ -365,7 +329,7 @@ func TestTaskMissingAndReadErrors(t *testing.T) {
 		{"wrongID", 200, strings.Replace(taskFixture, "task-1", "task-2", 1), 0, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/task/tasks/project-1" {
 					if tc.boardStatus == 0 {
 						t.Error("unexpected board lookup")
@@ -401,7 +365,7 @@ func TestTaskMissingAndReadErrors(t *testing.T) {
 				}
 			}
 			d := &taskDataSource{client: client}
-			config := taskTestConfig(t, taskModel{ID: types.StringValue("task-1")})
+			config := testConfig(t, &taskDataSource{}, taskModel{ID: types.StringValue("task-1")})
 			lookup := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &lookup)
 			if !lookup.Diagnostics.HasError() {

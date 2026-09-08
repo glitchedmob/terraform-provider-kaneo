@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -19,28 +18,6 @@ import (
 )
 
 const columnFixture = `{"id":"column-1","projectId":"project-1","name":"Testing","slug":"testing","position":4,"icon":null,"color":null,"isFinal":false,"createdAt":"2026-09-01T12:00:00Z","updatedAt":"2026-09-01T12:00:00Z"}`
-
-func columnTestPlan(t *testing.T, r *columnResource, model columnModel) tfsdk.Plan {
-	t.Helper()
-	var response resource.SchemaResponse
-	r.Schema(t.Context(), resource.SchemaRequest{}, &response)
-	plan := tfsdk.Plan{Schema: response.Schema}
-	if diags := plan.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return plan
-}
-
-func columnTestConfig(t *testing.T, d *columnDataSource, model columnModel) tfsdk.Config {
-	t.Helper()
-	var response datasource.SchemaResponse
-	d.Schema(t.Context(), datasource.SchemaRequest{}, &response)
-	state := tfsdk.State{Schema: response.Schema}
-	if diags := state.Set(t.Context(), model); diags.HasError() {
-		t.Fatal(diags)
-	}
-	return tfsdk.Config{Schema: response.Schema, Raw: state.Raw}
-}
 
 func columnTestModel() columnModel {
 	return columnModel{ProjectID: types.StringValue("project-1"), Name: types.StringValue("Testing"), IsFinal: types.BoolValue(false)}
@@ -71,25 +48,23 @@ func TestColumnAttributeValidators(t *testing.T) {
 
 func TestColumnResourceLifecycle(t *testing.T) {
 	var remote map[string]any
-	if err := json.Unmarshal([]byte(columnFixture), &remote); err != nil {
-		t.Fatal(err)
-	}
+	testFixture(t, columnFixture, &remote)
 	var calls []string
-	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.Path)
 		switch r.Method + " " + r.URL.Path {
 		case "POST /column/project-1":
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			if body["name"] != "Testing" || body["isFinal"] != false || len(body) != 2 {
 				t.Errorf("unexpected create body: %v", body)
 			}
 		case "PUT /column/column-1":
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			for _, field := range []string{"name", "icon", "color", "isFinal"} {
 				value, ok := body[field]
@@ -105,8 +80,8 @@ func TestColumnResourceLifecycle(t *testing.T) {
 					Position int32  `json:"position"`
 				} `json:"columns"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Error(err)
+			if !testDecodeRequest(t, w, r, &body) {
+				return
 			}
 			if len(body.Columns) != 1 || body.Columns[0].ID != "column-1" {
 				t.Errorf("reorder must update only the managed column: %+v", body)
@@ -114,29 +89,23 @@ func TestColumnResourceLifecycle(t *testing.T) {
 				return
 			}
 			remote["position"] = body.Columns[0].Position
-			if err := json.NewEncoder(w).Encode([]any{remote}); err != nil {
-				t.Error(err)
-			}
+			testEncodeResponse(t, w, []any{remote})
 			return
 		case "GET /column/project-1":
-			if err := json.NewEncoder(w).Encode([]any{remote}); err != nil {
-				t.Error(err)
-			}
+			testEncodeResponse(t, w, []any{remote})
 			return
 		case "DELETE /column/column-1":
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if err := json.NewEncoder(w).Encode(remote); err != nil {
-			t.Error(err)
-		}
+		testEncodeResponse(t, w, remote)
 	})
 	r := &columnResource{client: client}
 	model := columnTestModel()
 	// This value cannot round-trip through float32; the OpenAPI overlay must
 	// keep positions as integers in both request and response types.
 	model.Position = types.Int64Value(16777217)
-	plan := columnTestPlan(t, r, model)
+	plan := testPlan(t, r, model)
 	created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 	r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 	if created.Diagnostics.HasError() {
@@ -165,7 +134,7 @@ func TestColumnResourceLifecycle(t *testing.T) {
 			state.IsFinal = types.BoolValue(false)
 		}
 		update := resource.UpdateResponse{State: created.State}
-		r.Update(t.Context(), resource.UpdateRequest{Plan: columnTestPlan(t, r, state)}, &update)
+		r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, r, state)}, &update)
 		if update.Diagnostics.HasError() {
 			t.Fatal(update.Diagnostics)
 		}
@@ -184,10 +153,7 @@ func TestColumnResourceLifecycle(t *testing.T) {
 		}
 		created.State = update.State
 	}
-	imported := resource.ImportStateResponse{State: tfsdk.State{Schema: plan.Schema}}
-	if diags := imported.State.Set(t.Context(), columnModel{}); diags.HasError() {
-		t.Fatal(diags)
-	}
+	imported := resource.ImportStateResponse{State: tfsdk.State(testPlan(t, r, columnModel{}))}
 	r.ImportState(t.Context(), resource.ImportStateRequest{ID: "project-1/column-1"}, &imported)
 	if imported.Diagnostics.HasError() {
 		t.Fatal(imported.Diagnostics)
@@ -214,7 +180,7 @@ func TestColumnResourceLifecycle(t *testing.T) {
 func TestColumnPartialReorderFailure(t *testing.T) {
 	for _, create := range []bool{true, false} {
 		t.Run(fmt.Sprintf("create=%t", create), func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(r.URL.Path, "/reorder/") {
 					w.WriteHeader(403)
 					if _, err := fmt.Fprint(w, `{"message":"Forbidden"}`); err != nil {
@@ -230,7 +196,7 @@ func TestColumnPartialReorderFailure(t *testing.T) {
 			model := columnTestModel()
 			model.ID = types.StringValue("column-1")
 			model.Position = types.Int64Value(10)
-			plan := columnTestPlan(t, r, model)
+			plan := testPlan(t, r, model)
 			state := tfsdk.State{Schema: plan.Schema}
 			if create {
 				response := resource.CreateResponse{State: state}
@@ -278,7 +244,7 @@ func TestColumnReadAndDeleteErrors(t *testing.T) {
 		{"wrongProject", 200, 400, `[` + strings.Replace(columnFixture, "project-1", "project-2", 1) + `]`, true, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {
 					w.WriteHeader(tc.getStatus)
 					if _, err := fmt.Fprint(w, tc.body); err != nil {
@@ -294,7 +260,7 @@ func TestColumnReadAndDeleteErrors(t *testing.T) {
 			r := &columnResource{client: client}
 			model := columnTestModel()
 			model.ID = types.StringValue("column-1")
-			plan := columnTestPlan(t, r, model)
+			plan := testPlan(t, r, model)
 			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
@@ -313,7 +279,7 @@ func TestColumnReadAndDeleteErrors(t *testing.T) {
 func TestColumnDataSourceLookups(t *testing.T) {
 	for _, byID := range []bool{false, true} {
 		t.Run(fmt.Sprintf("byID=%t", byID), func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodGet || r.URL.Path != "/column/project-1" {
 					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 				}
@@ -328,7 +294,7 @@ func TestColumnDataSourceLookups(t *testing.T) {
 			} else {
 				model.Slug = types.StringValue("testing")
 			}
-			config := columnTestConfig(t, d, model)
+			config := testConfig(t, d, model)
 			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &response)
 			if response.Diagnostics.HasError() {
@@ -348,13 +314,13 @@ func TestColumnDataSourceLookups(t *testing.T) {
 func TestColumnDataSourceErrors(t *testing.T) {
 	for _, body := range []string{`[]`, `null`, `{}`, `{`, `[{}]`, `[` + columnFixture + `,` + strings.Replace(columnFixture, "column-1", "column-2", 1) + `]`} {
 		t.Run(body, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if _, err := fmt.Fprint(w, body); err != nil {
 					t.Error(err)
 				}
 			})
 			d := &columnDataSource{client: client}
-			config := columnTestConfig(t, d, columnModel{ProjectID: types.StringValue("project-1"), Slug: types.StringValue("testing")})
+			config := testConfig(t, d, columnModel{ProjectID: types.StringValue("project-1"), Slug: types.StringValue("testing")})
 			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}
 			d.Read(t.Context(), datasource.ReadRequest{Config: config}, &response)
 			if !response.Diagnostics.HasError() {
@@ -392,7 +358,7 @@ func TestColumnDataSourceValidators(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := &columnDataSource{}
-			config := columnTestConfig(t, d, columnModel{ProjectID: types.StringValue("project-1"), ID: tc.id, Slug: tc.slug})
+			config := testConfig(t, d, columnModel{ProjectID: types.StringValue("project-1"), ID: tc.id, Slug: tc.slug})
 			response := datasource.ValidateConfigResponse{}
 			d.ConfigValidators(t.Context())[0].ValidateDataSource(t.Context(), datasource.ValidateConfigRequest{Config: config}, &response)
 			if response.Diagnostics.HasError() == tc.valid {
