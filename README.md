@@ -35,7 +35,7 @@ make test
 make build
 ```
 
-The generated Go client in `internal/client/client.gen.go` is committed to the repository. Run `make generate` after updating `openapi/kaneo.openapi.json` or `openapi/kaneo.overlay.yaml`. The overlay contains local schema additions and compatibility fixes.
+The generated Go client and admin models in `internal/client/` are committed to the repository. Run `make generate` after updating the specifications or overlay in `openapi/`. See [API specifications](openapi/README.md) for the separately maintained admin endpoints and generation steps.
 
 ## License
 
