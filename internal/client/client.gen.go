@@ -148,6 +148,24 @@ func (e GetDeviceAuthorizationPageParamsUi) Valid() bool {
 	}
 }
 
+// Defines values for ListOrganizationMembersParamsSortDirection.
+const (
+	MemberSortAscending  ListOrganizationMembersParamsSortDirection = "asc"
+	MemberSortDescending ListOrganizationMembersParamsSortDirection = "desc"
+)
+
+// Valid indicates whether the value is a known member of the ListOrganizationMembersParamsSortDirection enum.
+func (e ListOrganizationMembersParamsSortDirection) Valid() bool {
+	switch e {
+	case MemberSortAscending:
+		return true
+	case MemberSortDescending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RemoveOrganizationTeam200JSONResponseBodyMessage.
 const (
 	TeamRemovedSuccessfully RemoveOrganizationTeam200JSONResponseBodyMessage = "Team removed successfully."
@@ -1596,6 +1614,16 @@ type Workspace struct {
 	Slug        string                                    `json:"slug"`
 }
 
+// WorkspaceInvitation defines model for WorkspaceInvitation.
+type WorkspaceInvitation struct {
+	Email          string                    `json:"email"`
+	ExpiresAt      time.Time                 `json:"expiresAt"`
+	Id             string                    `json:"id"`
+	OrganizationId string                    `json:"organizationId"`
+	Role           nullable.Nullable[string] `json:"role,omitempty"`
+	Status         string                    `json:"status"`
+}
+
 // WorkspaceMember defines model for WorkspaceMember.
 type WorkspaceMember struct {
 	Email string                    `json:"email"`
@@ -1605,6 +1633,18 @@ type WorkspaceMember struct {
 
 	// Role The member's workspace role: a built-in role (owner, admin, member, guest) or a custom role name.
 	Role string `json:"role"`
+}
+
+// WorkspaceMembershipMember defines model for WorkspaceMembershipMember.
+type WorkspaceMembershipMember struct {
+	Id             string `json:"id"`
+	OrganizationId string `json:"organizationId"`
+	Role           string `json:"role"`
+	User           *struct {
+		Email string `json:"email"`
+		Id    string `json:"id"`
+	} `json:"user,omitempty"`
+	UserId string `json:"userId"`
 }
 
 // WorkspaceRole defines model for WorkspaceRole.
@@ -1855,6 +1895,23 @@ type LeaveOrganizationJSONBody struct {
 	// OrganizationId The organization Id for the member to leave. Eg: "organization-id"
 	OrganizationId string `json:"organizationId"`
 }
+
+// ListOrganizationInvitationsParams defines parameters for ListOrganizationInvitations.
+type ListOrganizationInvitationsParams struct {
+	OrganizationId string `form:"organizationId" json:"organizationId"`
+}
+
+// ListOrganizationMembersParams defines parameters for ListOrganizationMembers.
+type ListOrganizationMembersParams struct {
+	OrganizationId string                                     `form:"organizationId" json:"organizationId"`
+	Limit          int                                        `form:"limit" json:"limit"`
+	Offset         int                                        `form:"offset" json:"offset"`
+	SortBy         string                                     `form:"sortBy" json:"sortBy"`
+	SortDirection  ListOrganizationMembersParamsSortDirection `form:"sortDirection" json:"sortDirection"`
+}
+
+// ListOrganizationMembersParamsSortDirection defines parameters for ListOrganizationMembers.
+type ListOrganizationMembersParamsSortDirection string
 
 // ListWorkspaceRolesParams defines parameters for ListWorkspaceRoles.
 type ListWorkspaceRolesParams struct {
@@ -3437,12 +3494,12 @@ type ClientInterface interface {
 	// ListOrganizationInvitations List Organization Invitations
 	//
 	// Corresponds with GET /auth/organization/list-invitations (the `ListOrganizationInvitations` operationId).
-	ListOrganizationInvitations(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListOrganizationInvitations(ctx context.Context, params *ListOrganizationInvitationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationMembers List Organization Members
 	//
 	// Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
-	ListOrganizationMembers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListOrganizationMembers(ctx context.Context, params *ListOrganizationMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWorkspaceRoles performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
 	ListWorkspaceRoles(ctx context.Context, params *ListWorkspaceRolesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5820,8 +5877,8 @@ func (c *Client) ListOrganization(ctx context.Context, reqEditors ...RequestEdit
 // ListOrganizationInvitations List Organization Invitations
 //
 // Corresponds with GET /auth/organization/list-invitations (the `ListOrganizationInvitations` operationId).
-func (c *Client) ListOrganizationInvitations(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationInvitationsRequest(c.Server)
+func (c *Client) ListOrganizationInvitations(ctx context.Context, params *ListOrganizationInvitationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationInvitationsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5835,8 +5892,8 @@ func (c *Client) ListOrganizationInvitations(ctx context.Context, reqEditors ...
 // ListOrganizationMembers List Organization Members
 //
 // Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
-func (c *Client) ListOrganizationMembers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationMembersRequest(c.Server)
+func (c *Client) ListOrganizationMembers(ctx context.Context, params *ListOrganizationMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationMembersRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10439,7 +10496,7 @@ func NewListOrganizationRequest(server string) (*http.Request, error) {
 }
 
 // NewListOrganizationInvitationsRequest constructs an http.Request for the ListOrganizationInvitations method
-func NewListOrganizationInvitationsRequest(server string) (*http.Request, error) {
+func NewListOrganizationInvitationsRequest(server string, params *ListOrganizationInvitationsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10457,6 +10514,29 @@ func NewListOrganizationInvitationsRequest(server string) (*http.Request, error)
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -10466,7 +10546,7 @@ func NewListOrganizationInvitationsRequest(server string) (*http.Request, error)
 }
 
 // NewListOrganizationMembersRequest constructs an http.Request for the ListOrganizationMembers method
-func NewListOrganizationMembersRequest(server string) (*http.Request, error) {
+func NewListOrganizationMembersRequest(server string, params *ListOrganizationMembersParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10482,6 +10562,61 @@ func NewListOrganizationMembersRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sortBy", params.SortBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sortDirection", params.SortDirection, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -15916,14 +16051,14 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /auth/organization/list-invitations (the `ListOrganizationInvitations` operationId).
-	ListOrganizationInvitationsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationInvitationsResponse, error)
+	ListOrganizationInvitationsWithResponse(ctx context.Context, params *ListOrganizationInvitationsParams, reqEditors ...RequestEditorFn) (*ListOrganizationInvitationsResponse, error)
 
 	// ListOrganizationMembersWithResponse List Organization Members
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
-	ListOrganizationMembersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationMembersResponse, error)
+	ListOrganizationMembersWithResponse(ctx context.Context, params *ListOrganizationMembersParams, reqEditors ...RequestEditorFn) (*ListOrganizationMembersResponse, error)
 
 	// ListWorkspaceRolesWithResponse performs a GET /auth/organization/list-roles (the `ListWorkspaceRoles` operationId) request.
 	//
@@ -18200,6 +18335,13 @@ func (r AddOrganizationTeamMemberResponse) ContentType() string {
 type CancelOrganizationInvitationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WorkspaceInvitation
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CancelOrganizationInvitationResponse) GetJSON200() *WorkspaceInvitation {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
@@ -18785,29 +18927,11 @@ type InviteOrganizationMemberResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		CreatedAt      string `json:"createdAt"`
-		Email          string `json:"email"`
-		ExpiresAt      string `json:"expiresAt"`
-		Id             string `json:"id"`
-		InviterId      string `json:"inviterId"`
-		OrganizationId string `json:"organizationId"`
-		Role           string `json:"role"`
-		Status         string `json:"status"`
-	}
+	JSON200 *WorkspaceInvitation
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r InviteOrganizationMemberResponse) GetJSON200() *struct {
-	CreatedAt      string `json:"createdAt"`
-	Email          string `json:"email"`
-	ExpiresAt      string `json:"expiresAt"`
-	Id             string `json:"id"`
-	InviterId      string `json:"inviterId"`
-	OrganizationId string `json:"organizationId"`
-	Role           string `json:"role"`
-	Status         string `json:"status"`
-} {
+func (r InviteOrganizationMemberResponse) GetJSON200() *WorkspaceInvitation {
 	return r.JSON200
 }
 
@@ -18918,6 +19042,13 @@ func (r ListOrganizationResponse) ContentType() string {
 type ListOrganizationInvitationsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]WorkspaceInvitation
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListOrganizationInvitationsResponse) GetJSON200() *[]WorkspaceInvitation {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
@@ -18952,6 +19083,19 @@ func (r ListOrganizationInvitationsResponse) ContentType() string {
 type ListOrganizationMembersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Members []WorkspaceMembershipMember `json:"members"`
+		Total   *int                        `json:"total"`
+	}
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListOrganizationMembersResponse) GetJSON200() *struct {
+	Members []WorkspaceMembershipMember `json:"members"`
+	Total   *int                        `json:"total"`
+} {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
@@ -19595,25 +19739,11 @@ type UpdateOrganizationMemberRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		Member struct {
-			Id             string `json:"id"`
-			OrganizationId string `json:"organizationId"`
-			Role           string `json:"role"`
-			UserId         string `json:"userId"`
-		} `json:"member"`
-	}
+	JSON200 *WorkspaceMembershipMember
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateOrganizationMemberRoleResponse) GetJSON200() *struct {
-	Member struct {
-		Id             string `json:"id"`
-		OrganizationId string `json:"organizationId"`
-		Role           string `json:"role"`
-		UserId         string `json:"userId"`
-	} `json:"member"`
-} {
+func (r UpdateOrganizationMemberRoleResponse) GetJSON200() *WorkspaceMembershipMember {
 	return r.JSON200
 }
 
@@ -24913,8 +25043,8 @@ func (c *ClientWithResponses) ListOrganizationWithResponse(ctx context.Context, 
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /auth/organization/list-invitations (the `ListOrganizationInvitations` operationId).
-func (c *ClientWithResponses) ListOrganizationInvitationsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationInvitationsResponse, error) {
-	rsp, err := c.ListOrganizationInvitations(ctx, reqEditors...)
+func (c *ClientWithResponses) ListOrganizationInvitationsWithResponse(ctx context.Context, params *ListOrganizationInvitationsParams, reqEditors ...RequestEditorFn) (*ListOrganizationInvitationsResponse, error) {
+	rsp, err := c.ListOrganizationInvitations(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -24926,8 +25056,8 @@ func (c *ClientWithResponses) ListOrganizationInvitationsWithResponse(ctx contex
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /auth/organization/list-members (the `ListOrganizationMembers` operationId).
-func (c *ClientWithResponses) ListOrganizationMembersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationMembersResponse, error) {
-	rsp, err := c.ListOrganizationMembers(ctx, reqEditors...)
+func (c *ClientWithResponses) ListOrganizationMembersWithResponse(ctx context.Context, params *ListOrganizationMembersParams, reqEditors ...RequestEditorFn) (*ListOrganizationMembersResponse, error) {
+	rsp, err := c.ListOrganizationMembers(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -28082,6 +28212,19 @@ func ParseCancelOrganizationInvitationResponse(rsp *http.Response) (*CancelOrgan
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WorkspaceInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	}
+
 	return response, nil
 }
 
@@ -28446,16 +28589,7 @@ func ParseInviteOrganizationMemberResponse(rsp *http.Response) (*InviteOrganizat
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			CreatedAt      string `json:"createdAt"`
-			Email          string `json:"email"`
-			ExpiresAt      string `json:"expiresAt"`
-			Id             string `json:"id"`
-			InviterId      string `json:"inviterId"`
-			OrganizationId string `json:"organizationId"`
-			Role           string `json:"role"`
-			Status         string `json:"status"`
-		}
+		var dest WorkspaceInvitation
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28527,6 +28661,19 @@ func ParseListOrganizationInvitationsResponse(rsp *http.Response) (*ListOrganiza
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []WorkspaceInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	}
+
 	return response, nil
 }
 
@@ -28541,6 +28688,22 @@ func ParseListOrganizationMembersResponse(rsp *http.Response) (*ListOrganization
 	response := &ListOrganizationMembersResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Members []WorkspaceMembershipMember `json:"members"`
+			Total   *int                        `json:"total"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
 	}
 
 	return response, nil
@@ -28964,14 +29127,7 @@ func ParseUpdateOrganizationMemberRoleResponse(rsp *http.Response) (*UpdateOrgan
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Member struct {
-				Id             string `json:"id"`
-				OrganizationId string `json:"organizationId"`
-				Role           string `json:"role"`
-				UserId         string `json:"userId"`
-			} `json:"member"`
-		}
+		var dest WorkspaceMembershipMember
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
