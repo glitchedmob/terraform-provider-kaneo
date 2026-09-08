@@ -4,7 +4,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -43,15 +42,7 @@ func (d *labelDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 }
 
 func (d *labelDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected Provider Data Type", fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData))
-		return
-	}
-	d.client = client
+	configureClient(req.ProviderData, &d.client, &resp.Diagnostics)
 }
 
 func (d *labelDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

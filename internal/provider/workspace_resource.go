@@ -76,18 +76,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 }
 
 func (r *workspaceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData),
-		)
-		return
-	}
-	r.client = client
+	configureClient(req.ProviderData, &r.client, &resp.Diagnostics)
 }
 
 func (r *workspaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
