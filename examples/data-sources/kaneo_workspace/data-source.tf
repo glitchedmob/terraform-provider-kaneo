@@ -1,7 +1,3 @@
-data "kaneo_workspace" "by_slug" {
+data "kaneo_workspace" "engineering" {
   slug = "engineering"
-}
-
-data "kaneo_workspace" "by_id" {
-  id = "workspace-id"
 }

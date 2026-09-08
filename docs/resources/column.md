@@ -11,20 +11,9 @@ Manages a column within a project's board. Kaneo refuses to delete columns conta
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
-resource "kaneo_project" "platform" {
-  workspace_id = kaneo_workspace.engineering.id
-  name         = "Platform"
-  slug         = "PLAT"
-}
-
-# Adds a column after the four default columns.
+# Use an existing project's ID. Appends after its current columns.
 resource "kaneo_column" "testing" {
-  project_id = kaneo_project.platform.id
+  project_id = "existing-project-id"
   name       = "Testing"
   icon       = "FlaskConical"
   color      = "#8b5cf6"
@@ -41,7 +30,7 @@ resource "kaneo_column" "testing" {
 - `is_final` (Boolean, Optional) Marks tasks in this column as done and stops their overdue reminders. Defaults to `false`.
 - `position` (Number, Optional) Absolute board position, an integer from `0` to `2147483647`. When omitted, new columns are appended and existing columns retain their current position.
 
-Setting `position` updates only this column. It does not shift other columns or prevent tied positions. To arrange the whole board, import the existing columns and assign distinct positions to each. The provider creates or updates the column before making a separate ordering request.
+`position` changes only this column; it neither shifts others nor prevents ties. Import all columns and assign distinct positions to arrange the board. Ordering can fail after a successful create or update; refresh and review the plan before retrying.
 
 Kaneo reserves the slugs `planned` and `archived` for virtual task statuses and rejects duplicate slugs within a project.
 
@@ -63,32 +52,10 @@ Kaneo automatically creates four columns for a new project:
 | In Review | `in-review` | 2 | false |
 | Done | `done` | 3 | true |
 
-These columns are not automatically managed by the provider. Import them explicitly rather than declaring new resources with the same names. A conflicting create fails instead of adopting an existing column.
-
-Import requires both IDs because Kaneo only lists columns within a project:
+Import defaults rather than creating duplicates; conflicting creates fail instead of adopting them. Import requires `project-id/column-id`:
 
 ```shell
 terraform import kaneo_column.todo project-id/column-id
 ```
 
-For an existing project, Terraform 1.5 or later can look up a default column and import it declaratively:
-
-```terraform
-data "kaneo_column" "todo" {
-  project_id = "existing-project-id"
-  slug       = "to-do"
-}
-
-resource "kaneo_column" "todo" {
-  project_id = data.kaneo_column.todo.project_id
-  name       = "To Do"
-  is_final   = false
-}
-
-import {
-  to = kaneo_column.todo
-  id = "${data.kaneo_column.todo.project_id}/${data.kaneo_column.todo.id}"
-}
-```
-
-Create the project first so the import IDs are known during planning. Match the resource arguments to the existing column before applying changes. In particular, set `is_final = true` when importing the default Done column.
+Match existing values, especially `is_final = true` for Done. See the [declarative default-column import example](/providers/glitchedmob/kaneo/latest/docs/guides/import). When managing projects or tasks in Terraform, reference project IDs and column slugs to establish dependencies; tasks must be deleted before their column.

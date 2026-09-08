@@ -11,24 +11,14 @@ Manages a task within a project. Deleting or replacing a task permanently delete
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
-resource "kaneo_project" "platform" {
-  workspace_id = kaneo_workspace.engineering.id
-  name         = "Platform"
-  slug         = "PLAT"
-}
-
+# Both objects belong to this existing project.
 resource "kaneo_column" "testing" {
-  project_id = kaneo_project.platform.id
+  project_id = "existing-project-id"
   name       = "Testing"
 }
 
 resource "kaneo_task" "deployment" {
-  project_id  = kaneo_project.platform.id
+  project_id  = kaneo_column.testing.project_id
   title       = "Verify deployment"
   description = "Run the deployment checks."
   status      = kaneo_column.testing.slug
@@ -51,7 +41,7 @@ resource "kaneo_task" "deployment" {
 
 Use the column's stable `slug` for `status`, not its ID or display name. Referencing `kaneo_column.example.slug` also tells Terraform to create the column first and delete the task before deleting the column. If the project's default To Do column no longer exists, set `status` explicitly.
 
-Dates require a timezone and support at most three fractional second digits, such as `2027-09-01T09:00:00.123Z` or `2027-09-01T05:00:00.123-04:00`. Kaneo normalizes timestamps to UTC. The provider preserves the configured spelling when the API returns the same instant, but detects actual changes down to the millisecond. Date-only strings and higher precision are rejected before applying.
+Dates require a timezone and at most three fractional digits, such as `2027-09-01T09:00:00.123Z` or `2027-09-01T05:00:00.123-04:00`. Date-only strings and higher precision are rejected. Kaneo normalizes to UTC; equivalent configured spelling is preserved, with drift detected to the millisecond.
 
 ## Attribute reference
 
@@ -60,7 +50,7 @@ Dates require a timezone and support at most three fractional second digits, suc
 - `position` (Number) API-assigned order within the column. May be null for legacy tasks.
 - `created_at` (String) Task creation timestamp.
 
-Task numbering and ordering are not configurable. New tasks are appended to their selected column. Updates preserve the position from refreshed state, including when changing status; they do not reorder other tasks or prevent tied positions. A legacy task with a null position cannot be updated through Kaneo's full update endpoint without choosing a position, so the provider reports an error instead of inventing one. Set its position in Kaneo and refresh before retrying.
+Numbering and ordering are read-only. New tasks append to their column; updates preserve refreshed position even when status changes, without reordering others or preventing ties. For legacy tasks with null position, set a position in Kaneo and refresh before retrying updates.
 
 ## Import
 
@@ -70,19 +60,10 @@ Import by task ID, not its displayed project-slug/number identifier:
 terraform import kaneo_task.deployment task-id
 ```
 
-Terraform 1.5 or later also supports declarative import:
+Match the existing task before applying: omitted description, assignee, or dates clear those values; omitted status or priority applies defaults. Import reads dates in UTC, also shown by the task data source. See the [import guide](/providers/glitchedmob/kaneo/latest/docs/guides/import).
 
-```terraform
-import {
-  to = kaneo_task.deployment
-  id = "task-id"
-}
-```
+## Limitations and recovery
 
-Configure the target resource to match the existing task before applying. In particular, omitting its description, assignee, or dates clears those values, and omitting status or priority applies the provider defaults. Import reads dates in UTC; the task data source can show their returned values.
-
-## Drift and deletion
-
-Terraform restores configured task fields changed outside Terraform and recreates deleted tasks. Because Kaneo can report a missing task as HTTP 400, the provider confirms absence against the complete project board, including planned and archived tasks. Authorization errors, malformed responses, or a failed project lookup produce diagnostics rather than removing the task from state. If the parent project was also deleted externally, that failed lookup requires separate reconciliation.
+Terraform restores configured fields and recreates deleted tasks. Failed or unauthorized lookups retain state; reconcile an externally deleted project separately if its board is unreadable.
 
 Comments, attachments, labels, and task relationships are not managed by this resource.

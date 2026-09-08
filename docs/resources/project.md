@@ -11,13 +11,9 @@ Manages a Kaneo project within a workspace. Deleting a project permanently delet
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
+# Replace with an existing workspace ID.
 resource "kaneo_project" "platform" {
-  workspace_id = kaneo_workspace.engineering.id
+  workspace_id = "existing-workspace-id"
   name         = "Platform"
   slug         = "PLAT"
   icon         = "Code"
@@ -35,7 +31,7 @@ resource "kaneo_project" "platform" {
 - `description` (String, Optional) Project description. Defaults to an empty string. Removing this argument clears the description.
 - `is_public` (Boolean, Optional) Whether the project board is readable without signing in. Defaults to `false`.
 
-Kaneo's create endpoint does not accept description or visibility. The provider sends an update after creation when either differs from the API defaults. Null descriptions returned by Kaneo are represented as empty strings, and null visibility values as `false`.
+Null API descriptions become empty strings; null visibility becomes `false`. Description or visibility setup can fail after creation; refresh and review the plan before retrying.
 
 ## Attribute reference
 
@@ -45,10 +41,10 @@ Kaneo's create endpoint does not accept description or visibility. The provider 
 
 ## Import
 
-Import a project with its ID:
-
 ```shell
 terraform import kaneo_project.platform project-id
 ```
 
-Import retrieves the workspace ID and project attributes from Kaneo. Set the arguments in your configuration to match the imported project before applying changes.
+Import retrieves the workspace ID and project attributes. Match them before applying. See the [import guide](/providers/glitchedmob/kaneo/latest/docs/guides/import) for declarative imports and dependency guidance.
+
+New projects get four [default columns](/providers/glitchedmob/kaneo/latest/docs/resources/column#import-and-default-columns); import those rather than creating duplicates.

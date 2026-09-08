@@ -12,15 +12,11 @@ Retrieves a Kaneo project, including archived projects. Specify either `id` alon
 
 ```terraform
 data "kaneo_project" "by_id" {
-  id = "project-id"
-}
-
-data "kaneo_workspace" "engineering" {
-  slug = "engineering"
+  id = "existing-project-id"
 }
 
 data "kaneo_project" "by_slug" {
-  workspace_id = data.kaneo_workspace.engineering.id
+  workspace_id = "existing-workspace-id"
   slug         = "PLAT"
 }
 ```
@@ -31,7 +27,7 @@ data "kaneo_project" "by_slug" {
 - `workspace_id` (String, Optional) Workspace identifier. Required with `slug`.
 - `slug` (String, Optional) Project slug. Required with `workspace_id`.
 
-Lookup arguments must not be empty. Lookup fails if no project matches. Kaneo permits duplicate project slugs within a workspace, so slug lookup also fails if multiple projects match. Use an ID to select one of those projects.
+Lookup arguments must not be empty. Missing or ambiguous matches fail. Kaneo allows duplicate slugs within a workspace; use an ID to disambiguate.
 
 ## Attribute reference
 

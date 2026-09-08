@@ -6,13 +6,13 @@ description: |-
 
 # kaneo_task
 
-Retrieves a task by its task ID, including planned and archived tasks. A project ID is not required. Missing tasks and lookup failures produce diagnostics.
+Retrieves a task, including planned or archived tasks, without a project ID. Missing tasks and failed lookups are errors.
 
 ## Example usage
 
 ```terraform
 data "kaneo_task" "deployment" {
-  id = "task-id"
+  id = "existing-task-id"
 }
 ```
 
@@ -34,4 +34,4 @@ data "kaneo_task" "deployment" {
 - `position` (Number) Order within the column. May be null for legacy tasks.
 - `created_at` (String) Task creation timestamp.
 
-Dates are returned in UTC with fractional seconds when present. Slugs remain stable after column renames, so `status` may differ from the column's display name.
+Dates use UTC with fractional seconds when present. Column renames preserve slugs, so `status` can differ from the display name.
