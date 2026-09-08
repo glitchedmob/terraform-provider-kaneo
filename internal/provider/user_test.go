@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -26,14 +25,9 @@ func userTestResource(t *testing.T, handler http.HandlerFunc) (*userResource, tf
 		t.Fatal(err)
 	}
 	r := &userResource{client: client}
-	schema := &resource.SchemaResponse{}
-	r.Schema(t.Context(), resource.SchemaRequest{}, schema)
-	state := tfsdk.State{Schema: schema.Schema}
 	model := userModel{ID: types.StringValue("user-1"), Name: types.StringValue("Test"), Email: types.StringValue("Test@Example.com"), Role: types.StringValue("user"), EmailVerified: types.BoolValue(false), PasswordWO: types.StringNull(), PasswordWOVersion: types.Int64Value(1)}
-	if d := state.Set(t.Context(), &model); d.HasError() {
-		t.Fatal(d)
-	}
-	return r, state, tfsdk.Plan{Schema: schema.Schema, Raw: state.Raw}
+	plan := testPlan(t, r, model)
+	return r, tfsdk.State(plan), plan
 }
 
 func userTestConfig(t *testing.T, plan tfsdk.Plan, password types.String) tfsdk.Config {
@@ -89,7 +83,7 @@ func TestUserReadPreservesPasswordVersionAndEmailCase(t *testing.T) {
 			})
 			if imported {
 				empty := userModel{ID: types.StringNull(), Email: types.StringNull(), Name: types.StringNull(), Role: types.StringNull(), PasswordWO: types.StringNull(), PasswordWOVersion: types.Int64Null(), EmailVerified: types.BoolNull()}
-				state.Set(t.Context(), &empty)
+				state = tfsdk.State(testPlan(t, r, empty))
 				result := &resource.ImportStateResponse{State: state}
 				r.ImportState(t.Context(), resource.ImportStateRequest{ID: "user-1"}, result)
 				if result.Diagnostics.HasError() {
@@ -128,8 +122,8 @@ func TestUserPartialCreateAndUpdate(t *testing.T) {
 				calls = append(calls, req.URL.Path)
 				w.Header().Set("Content-Type", "application/json")
 				var body map[string]any
-				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
-					t.Error(err)
+				if !testDecodeRequest(t, w, req, &body) {
+					return
 				}
 				user := `{"id":"user-1","name":"Test","email":"test@example.com","role":"user","emailVerified":false}`
 				switch req.URL.Path {
@@ -162,9 +156,11 @@ func TestUserPartialCreateAndUpdate(t *testing.T) {
 			var result tfsdk.State
 			if update {
 				var old userModel
-				state.Get(t.Context(), &old)
+				if diags := state.Get(t.Context(), &old); diags.HasError() {
+					t.Fatal(diags)
+				}
 				old.PasswordWOVersion = types.Int64Value(2)
-				state.Set(t.Context(), &old)
+				state = tfsdk.State(testPlan(t, r, old))
 				resp := &resource.UpdateResponse{State: state}
 				r.Update(t.Context(), resource.UpdateRequest{Plan: plan, State: state, Config: userTestConfig(t, plan, types.StringValue("secret-password"))}, resp)
 				if !resp.Diagnostics.HasError() || strings.Contains(fmt.Sprint(resp.Diagnostics), "secret-password") {
@@ -247,11 +243,11 @@ func TestUserOptionalPassword(t *testing.T) {
 			})
 			if operation != "update unchanged password" {
 				var model userModel
-				state.Get(t.Context(), &model)
+				if diags := state.Get(t.Context(), &model); diags.HasError() {
+					t.Fatal(diags)
+				}
 				model.PasswordWOVersion = types.Int64Null()
-				planned := tfsdk.State{Schema: state.Schema}
-				planned.Set(t.Context(), &model)
-				plan.Raw = planned.Raw
+				plan = testPlan(t, r, model)
 			}
 			password := types.StringNull()
 			if operation == "update unchanged password" {

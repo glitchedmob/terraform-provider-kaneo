@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -15,24 +14,39 @@ import (
 )
 
 func TestWorkspaceMemberReconciliation(t *testing.T) {
-	for _, mode := range []string{"cancel acceptance update", "cancel acceptance delete", "invite acceptance", "replacement denied", "cancel denied", "cancel wrong shape", "update wrong envelope", "remove wrong shape", "remove missing target", "remove missing operator", "update missing operator", "remove denied", "update denied"} {
-		t.Run(mode, func(t *testing.T) {
+	for _, tc := range []struct {
+		name                           string
+		accepted, deleting, success    bool
+		cancel, invite, update, remove string
+	}{
+		{name: "cancel acceptance update", cancel: "acceptance", success: true},
+		{name: "cancel acceptance delete", cancel: "acceptance", deleting: true, success: true},
+		{name: "invite acceptance", invite: "acceptance", success: true},
+		{name: "replacement denied", invite: "denied"},
+		{name: "cancel denied", cancel: "denied"},
+		{name: "cancel wrong shape", cancel: "wrong shape"},
+		{name: "update wrong envelope", accepted: true, update: "wrong envelope"},
+		{name: "remove wrong shape", accepted: true, deleting: true, remove: "wrong shape"},
+		{name: "remove missing target", accepted: true, deleting: true, remove: "missing target", success: true},
+		{name: "remove missing operator", accepted: true, deleting: true, remove: "missing operator"},
+		{name: "update missing operator", accepted: true, update: "missing operator"},
+		{name: "remove denied", accepted: true, deleting: true, remove: "denied"},
+		{name: "update denied", accepted: true, update: "denied"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			i := invitationWire("invite", "pending", "member")
 			var m map[string]any
-			accepted := strings.HasPrefix(mode, "update") || strings.HasPrefix(mode, "remove")
-			if accepted {
+			if tc.accepted {
 				m = memberWire("target", "target@example.com", "member")
 				i["status"] = "accepted"
 			}
 			forbidden := false
 			mutations := 0
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				var body map[string]any
 				if r.Method == "POST" {
 					mutations++
-					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-						t.Error(err)
-						w.WriteHeader(http.StatusBadRequest)
+					if !testDecodeRequest(t, w, r, &body) {
 						return
 					}
 				}
@@ -56,7 +70,7 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 				case "list-invitations":
 					v = []any{i}
 				case "cancel-invitation":
-					if mode == "cancel denied" {
+					if tc.cancel == "denied" {
 						w.WriteHeader(403)
 						if _, err := fmt.Fprint(w, `{"code":"YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_INVITATION"}`); err != nil {
 							t.Error(err)
@@ -64,22 +78,22 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 						return
 					}
 					i["status"] = "canceled"
-					if strings.HasPrefix(mode, "cancel acceptance") {
+					if tc.cancel == "acceptance" {
 						m = memberWire("target", "target@example.com", "member")
 					}
 					v = i
-					if mode == "cancel wrong shape" {
+					if tc.cancel == "wrong shape" {
 						v = map[string]any{"invitation": i}
 					}
 				case "invite-member":
-					if mode == "replacement denied" {
+					if tc.invite == "denied" {
 						w.WriteHeader(403)
 						if _, err := fmt.Fprint(w, `{"code":"FORBIDDEN"}`); err != nil {
 							t.Error(err)
 						}
 						return
 					}
-					if mode == "invite acceptance" {
+					if tc.invite == "acceptance" {
 						m = memberWire("target", "target@example.com", "member")
 						i["status"] = "accepted"
 						w.WriteHeader(400)
@@ -90,14 +104,14 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 					}
 					t.Error("unexpected reinvite")
 				case "update-member-role":
-					if mode == "update denied" {
+					if tc.update == "denied" {
 						w.WriteHeader(403)
 						if _, err := fmt.Fprint(w, `{"code":"YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER"}`); err != nil {
 							t.Error(err)
 						}
 						return
 					}
-					if mode == "update missing operator" {
+					if tc.update == "missing operator" {
 						forbidden = true
 						w.WriteHeader(400)
 						if _, err := fmt.Fprint(w, `{"code":"MEMBER_NOT_FOUND"}`); err != nil {
@@ -107,20 +121,20 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 					}
 					m["role"] = body["role"]
 					v = m
-					if mode == "update wrong envelope" {
+					if tc.update == "wrong envelope" {
 						v = map[string]any{"member": m}
 					}
 				case "remove-member":
-					if mode == "remove denied" {
+					if tc.remove == "denied" {
 						w.WriteHeader(401)
 						if _, err := fmt.Fprint(w, `{"code":"YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER"}`); err != nil {
 							t.Error(err)
 						}
 						return
 					}
-					if mode == "remove missing target" || mode == "remove missing operator" {
+					if tc.remove == "missing target" || tc.remove == "missing operator" {
 						m = nil
-						forbidden = mode == "remove missing operator"
+						forbidden = tc.remove == "missing operator"
 						w.WriteHeader(400)
 						if _, err := fmt.Fprint(w, `{"code":"MEMBER_NOT_FOUND"}`); err != nil {
 							t.Error(err)
@@ -129,31 +143,28 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 					}
 					v = map[string]any{"member": m}
 					m = nil
-					if mode == "remove wrong shape" {
+					if tc.remove == "wrong shape" {
 						v = map[string]any{"success": true}
 					}
 				default:
 					t.Errorf("unexpected endpoint %s", r.URL.Path)
 				}
-				if err := json.NewEncoder(w).Encode(v); err != nil {
-					t.Error(err)
-				}
+				testEncodeResponse(t, w, v)
 			})
 			r := &workspaceMemberResource{client: c}
 			model := memberTestModel()
 			model.Status = types.StringValue("pending")
 			model.InvitationID = types.StringValue("invite")
 			model.MemberID = types.StringNull()
-			if accepted {
+			if tc.accepted {
 				model.Status = types.StringValue("accepted")
 				model.MemberID = types.StringValue("target")
 				model.InvitationID = types.StringNull()
 			}
-			p := memberTestPlan(t, model)
+			p := testPlan(t, &workspaceMemberResource{}, model)
 			state := tfsdk.State(p)
-			deleting := strings.HasPrefix(mode, "remove") || mode == "cancel acceptance delete"
-			success := strings.Contains(mode, "acceptance") || mode == "remove missing target"
-			if deleting {
+			success := tc.success
+			if tc.deleting {
 				resp := resource.DeleteResponse{State: state}
 				r.Delete(t.Context(), resource.DeleteRequest{State: state}, &resp)
 				if resp.Diagnostics.HasError() == success {
@@ -168,7 +179,7 @@ func TestWorkspaceMemberReconciliation(t *testing.T) {
 			} else {
 				model.Role = types.StringValue("custom")
 				resp := resource.UpdateResponse{State: state}
-				r.Update(t.Context(), resource.UpdateRequest{State: state, Plan: memberTestPlan(t, model)}, &resp)
+				r.Update(t.Context(), resource.UpdateRequest{State: state, Plan: testPlan(t, &workspaceMemberResource{}, model)}, &resp)
 				if resp.Diagnostics.HasError() == success {
 					t.Fatalf("unexpected update diagnostics %v", resp.Diagnostics)
 				}
@@ -199,7 +210,7 @@ func TestWorkspaceMemberPresence(t *testing.T) {
 		{"wrong id", `{"id":"different"}`, 200, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if !strings.HasSuffix(r.URL.Path, "get-full-organization") {
 					t.Error("unexpected endpoint")
 				}
@@ -209,7 +220,7 @@ func TestWorkspaceMemberPresence(t *testing.T) {
 				}
 			})
 			model := memberTestModel()
-			p := memberTestPlan(t, model)
+			p := testPlan(t, &workspaceMemberResource{}, model)
 			state := tfsdk.State(p)
 			resp := resource.ReadResponse{State: state}
 			(&workspaceMemberResource{client: c}).Read(t.Context(), resource.ReadRequest{State: state}, &resp)
@@ -225,7 +236,7 @@ func TestWorkspaceMemberPresence(t *testing.T) {
 }
 
 func TestWorkspaceMemberTerminalAfterAcceptedHistory(t *testing.T) {
-	c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		var v any
 		switch {
 		case strings.HasSuffix(r.URL.Path, "get-full-organization"):
@@ -237,13 +248,11 @@ func TestWorkspaceMemberTerminalAfterAcceptedHistory(t *testing.T) {
 		default:
 			t.Error("refresh mutated access")
 		}
-		if err := json.NewEncoder(w).Encode(v); err != nil {
-			t.Error(err)
-		}
+		testEncodeResponse(t, w, v)
 	})
 	model := memberTestModel()
 	model.InvitationID = types.StringValue("current")
-	p := memberTestPlan(t, model)
+	p := testPlan(t, &workspaceMemberResource{}, model)
 	state := tfsdk.State(p)
 	resp := resource.ReadResponse{State: state}
 	(&workspaceMemberResource{client: c}).Read(t.Context(), resource.ReadRequest{State: state}, &resp)

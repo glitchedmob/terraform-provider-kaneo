@@ -4,7 +4,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -17,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/oapi-codegen/nullable"
 )
 
@@ -66,9 +64,7 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 			Description *string `json:"description"`
 			Logo        *string `json:"logo"`
 		}
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			s.t.Errorf("decode create request: %v", err)
-			writer.WriteHeader(http.StatusBadRequest)
+		if !testDecodeRequest(s.t, writer, request, &body) {
 			return
 		}
 		s.workspace = &workspaceAPIValue{
@@ -79,19 +75,13 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 			Logo:        body.Logo,
 			CreatedAt:   "2026-01-02T03:04:05Z",
 		}
-		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
-			s.t.Error(err)
-		}
+		testEncodeResponse(s.t, writer, s.workspace)
 	case request.Method == http.MethodGet && request.URL.Path == "/api/auth/organization/list":
 		if s.workspace == nil {
-			if err := json.NewEncoder(writer).Encode([]workspaceAPIValue{}); err != nil {
-				s.t.Error(err)
-			}
+			testEncodeResponse(s.t, writer, []workspaceAPIValue{})
 			return
 		}
-		if err := json.NewEncoder(writer).Encode([]workspaceAPIValue{*s.workspace}); err != nil {
-			s.t.Error(err)
-		}
+		testEncodeResponse(s.t, writer, []workspaceAPIValue{*s.workspace})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/update":
 		var body struct {
 			OrganizationID string `json:"organizationId"`
@@ -102,9 +92,7 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 				Logo        *string `json:"logo"`
 			} `json:"data"`
 		}
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			s.t.Errorf("decode update request: %v", err)
-			writer.WriteHeader(http.StatusBadRequest)
+		if !testDecodeRequest(s.t, writer, request, &body) {
 			return
 		}
 		if s.workspace == nil || body.OrganizationID != s.workspace.ID {
@@ -119,25 +107,19 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 		}
 		s.workspace.Description = body.Data.Description
 		s.workspace.Logo = body.Data.Logo
-		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
-			s.t.Error(err)
-		}
+		testEncodeResponse(s.t, writer, s.workspace)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/delete":
 		var body struct {
 			OrganizationID string `json:"organizationId"`
 		}
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			s.t.Errorf("decode delete request: %v", err)
-			writer.WriteHeader(http.StatusBadRequest)
+		if !testDecodeRequest(s.t, writer, request, &body) {
 			return
 		}
 		if s.workspace == nil || body.OrganizationID != s.workspace.ID {
 			http.Error(writer, "workspace not found", http.StatusBadRequest)
 			return
 		}
-		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
-			s.t.Error(err)
-		}
+		testEncodeResponse(s.t, writer, s.workspace)
 		s.workspace = nil
 	default:
 		http.NotFound(writer, request)
@@ -164,17 +146,11 @@ func TestWorkspaceResourceLifecycle(t *testing.T) {
 
 	createResponse := &resource.CreateResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
 	workspaceResource.Create(ctx, resource.CreateRequest{
-		Plan: tfsdk.Plan{
-			Raw: workspaceRawValue(map[string]any{
-				"id":          tftypes.UnknownValue,
-				"name":        "Engineering",
-				"slug":        "engineering",
-				"description": "Engineering workspace",
-				"logo":        nil,
-				"created_at":  tftypes.UnknownValue,
-			}),
-			Schema: schemaResponse.Schema,
-		},
+		Plan: testPlan(t, workspaceResource, workspaceModel{
+			ID: types.StringUnknown(), Name: types.StringValue("Engineering"),
+			Slug: types.StringValue("engineering"), Description: types.StringValue("Engineering workspace"),
+			Logo: types.StringNull(), CreatedAt: types.StringUnknown(),
+		}),
 	}, createResponse)
 	if createResponse.Diagnostics.HasError() {
 		t.Fatalf("unexpected create diagnostics: %v", createResponse.Diagnostics)
@@ -190,17 +166,11 @@ func TestWorkspaceResourceLifecycle(t *testing.T) {
 
 	updateResponse := &resource.UpdateResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
 	workspaceResource.Update(ctx, resource.UpdateRequest{
-		Plan: tfsdk.Plan{
-			Raw: workspaceRawValue(map[string]any{
-				"id":          "workspace-1",
-				"name":        "Product Engineering",
-				"slug":        "product-engineering",
-				"description": "Updated description",
-				"logo":        "https://example.com/logo.png",
-				"created_at":  "2026-01-02T03:04:05Z",
-			}),
-			Schema: schemaResponse.Schema,
-		},
+		Plan: testPlan(t, workspaceResource, workspaceModel{
+			ID: types.StringValue("workspace-1"), Name: types.StringValue("Product Engineering"),
+			Slug: types.StringValue("product-engineering"), Description: types.StringValue("Updated description"),
+			Logo: types.StringValue("https://example.com/logo.png"), CreatedAt: types.StringValue("2026-01-02T03:04:05Z"),
+		}),
 	}, updateResponse)
 	if updateResponse.Diagnostics.HasError() {
 		t.Fatalf("unexpected update diagnostics: %v", updateResponse.Diagnostics)
@@ -235,17 +205,10 @@ func TestWorkspaceResourceRemovesMissingWorkspace(t *testing.T) {
 	workspaceResource := server.client(t)
 	schemaResponse := &resource.SchemaResponse{}
 	workspaceResource.Schema(ctx, resource.SchemaRequest{}, schemaResponse)
-	state := tfsdk.State{
-		Raw: workspaceRawValue(map[string]any{
-			"id":          "missing",
-			"name":        "Missing",
-			"slug":        "missing",
-			"description": nil,
-			"logo":        nil,
-			"created_at":  "2026-01-02T03:04:05Z",
-		}),
-		Schema: schemaResponse.Schema,
-	}
+	state := tfsdk.State(testPlan(t, workspaceResource, workspaceModel{
+		ID: types.StringValue("missing"), Name: types.StringValue("Missing"), Slug: types.StringValue("missing"),
+		Description: types.StringNull(), Logo: types.StringNull(), CreatedAt: types.StringValue("2026-01-02T03:04:05Z"),
+	}))
 	response := &resource.ReadResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
 	workspaceResource.Read(ctx, resource.ReadRequest{State: state}, response)
 
@@ -262,12 +225,7 @@ func TestWorkspaceResourceImport(t *testing.T) {
 
 	ctx := context.Background()
 	workspaceResource := &workspaceResource{}
-	schemaResponse := &resource.SchemaResponse{}
-	workspaceResource.Schema(ctx, resource.SchemaRequest{}, schemaResponse)
-	response := &resource.ImportStateResponse{State: tfsdk.State{
-		Raw:    workspaceRawValue(map[string]any{}),
-		Schema: schemaResponse.Schema,
-	}}
+	response := &resource.ImportStateResponse{State: tfsdk.State(testPlan(t, workspaceResource, workspaceModel{}))}
 	workspaceResource.ImportState(ctx, resource.ImportStateRequest{ID: "workspace-1"}, response)
 
 	if response.Diagnostics.HasError() {
@@ -300,30 +258,14 @@ func TestWorkspaceDataSourceLookup(t *testing.T) {
 	schemaResponse := &datasource.SchemaResponse{}
 	dataSource.Schema(ctx, datasource.SchemaRequest{}, schemaResponse)
 
-	for name, lookup := range map[string]map[string]any{
-		"by ID": {
-			"id":   "workspace-1",
-			"slug": nil,
-		},
-		"by slug": {
-			"id":   nil,
-			"slug": "engineering",
-		},
+	for name, lookup := range map[string]workspaceModel{
+		"by ID":   {ID: types.StringValue("workspace-1")},
+		"by slug": {Slug: types.StringValue("engineering")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			response := &datasource.ReadResponse{State: tfsdk.State{Schema: schemaResponse.Schema}}
 			dataSource.Read(ctx, datasource.ReadRequest{
-				Config: tfsdk.Config{
-					Raw: workspaceRawValue(map[string]any{
-						"id":          lookup["id"],
-						"name":        nil,
-						"slug":        lookup["slug"],
-						"description": nil,
-						"logo":        nil,
-						"created_at":  nil,
-					}),
-					Schema: schemaResponse.Schema,
-				},
+				Config: testConfig(t, dataSource, lookup),
 			}, response)
 			if response.Diagnostics.HasError() {
 				t.Fatalf("unexpected data source diagnostics: %v", response.Diagnostics)
@@ -345,31 +287,19 @@ func TestWorkspaceDataSourceRequiresOneLookupAttribute(t *testing.T) {
 
 	ctx := context.Background()
 	dataSource := &workspaceDataSource{}
-	schemaResponse := &datasource.SchemaResponse{}
-	dataSource.Schema(ctx, datasource.SchemaRequest{}, schemaResponse)
 	validator := dataSource.ConfigValidators(ctx)[0]
 
 	for name, test := range map[string]struct {
-		lookup    map[string]any
+		lookup    workspaceModel
 		wantError bool
 	}{
-		"neither": {lookup: map[string]any{"id": nil, "slug": nil}, wantError: true},
-		"both":    {lookup: map[string]any{"id": "workspace-1", "slug": "engineering"}, wantError: true},
-		"ID":      {lookup: map[string]any{"id": "workspace-1", "slug": nil}},
-		"slug":    {lookup: map[string]any{"id": nil, "slug": "engineering"}},
+		"neither": {lookup: workspaceModel{}, wantError: true},
+		"both":    {lookup: workspaceModel{ID: types.StringValue("workspace-1"), Slug: types.StringValue("engineering")}, wantError: true},
+		"ID":      {lookup: workspaceModel{ID: types.StringValue("workspace-1")}},
+		"slug":    {lookup: workspaceModel{Slug: types.StringValue("engineering")}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			request := datasource.ValidateConfigRequest{Config: tfsdk.Config{
-				Raw: workspaceRawValue(map[string]any{
-					"id":          test.lookup["id"],
-					"name":        nil,
-					"slug":        test.lookup["slug"],
-					"description": nil,
-					"logo":        nil,
-					"created_at":  nil,
-				}),
-				Schema: schemaResponse.Schema,
-			}}
+			request := datasource.ValidateConfigRequest{Config: testConfig(t, dataSource, test.lookup)}
 			response := &datasource.ValidateConfigResponse{}
 			validator.ValidateDataSource(ctx, request, response)
 			if response.Diagnostics.HasError() != test.wantError {
@@ -377,22 +307,6 @@ func TestWorkspaceDataSourceRequiresOneLookupAttribute(t *testing.T) {
 			}
 		})
 	}
-}
-
-func workspaceRawValue(attributes map[string]any) tftypes.Value {
-	attributeTypes := map[string]tftypes.Type{
-		"id":          tftypes.String,
-		"name":        tftypes.String,
-		"slug":        tftypes.String,
-		"description": tftypes.String,
-		"logo":        tftypes.String,
-		"created_at":  tftypes.String,
-	}
-	values := make(map[string]tftypes.Value, len(attributeTypes))
-	for name, valueType := range attributeTypes {
-		values[name] = tftypes.NewValue(valueType, attributes[name])
-	}
-	return tftypes.NewValue(tftypes.Object{AttributeTypes: attributeTypes}, values)
 }
 
 func TestWorkspaceModelUsesMetadataDescriptionFallback(t *testing.T) {

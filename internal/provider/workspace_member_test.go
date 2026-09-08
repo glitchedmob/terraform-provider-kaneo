@@ -3,7 +3,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -17,16 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func memberTestPlan(t *testing.T, m workspaceMemberModel) tfsdk.Plan {
-	t.Helper()
-	var s resource.SchemaResponse
-	(&workspaceMemberResource{}).Schema(t.Context(), resource.SchemaRequest{}, &s)
-	p := tfsdk.Plan{Schema: s.Schema}
-	if d := p.Set(t.Context(), m); d.HasError() {
-		t.Fatal(d)
-	}
-	return p
-}
 func memberTestModel() workspaceMemberModel {
 	return workspaceMemberModel{ID: types.StringValue("ws/target@example.com"), WorkspaceID: types.StringValue("ws"), Email: types.StringValue("target@example.com"), Role: types.StringValue("member"), Status: types.StringUnknown(), MemberID: types.StringUnknown(), InvitationID: types.StringUnknown()}
 }
@@ -42,11 +31,11 @@ func TestWorkspaceMemberLifecycle(t *testing.T) {
 			invitations := []map[string]any{}
 			members := []map[string]any{memberWire("owner", "owner@example.com", "owner")}
 			invites := 0
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				var body map[string]any
 				if r.Method == "POST" {
-					if e := json.NewDecoder(r.Body).Decode(&body); e != nil {
-						t.Error(e)
+					if !testDecodeRequest(t, w, r, &body) {
+						return
 					}
 				} else if r.URL.Query().Get("organizationId") != "ws" {
 					t.Error("unscoped query")
@@ -89,13 +78,11 @@ func TestWorkspaceMemberLifecycle(t *testing.T) {
 				default:
 					t.Errorf("unexpected operation %s", r.URL.Path)
 				}
-				if e := json.NewEncoder(w).Encode(result); e != nil {
-					t.Error(e)
-				}
+				testEncodeResponse(t, w, result)
 			})
 			r := &workspaceMemberResource{client: c}
 			m := memberTestModel()
-			p := memberTestPlan(t, m)
+			p := testPlan(t, &workspaceMemberResource{}, m)
 			created := resource.CreateResponse{State: tfsdk.State{Schema: p.Schema}}
 			r.Create(t.Context(), resource.CreateRequest{Plan: p}, &created)
 			if created.Diagnostics.HasError() {
@@ -130,7 +117,7 @@ func TestWorkspaceMemberLifecycle(t *testing.T) {
 			}
 			m.Role = types.StringValue("custom")
 			updated := resource.UpdateResponse{State: read.State}
-			r.Update(t.Context(), resource.UpdateRequest{Plan: memberTestPlan(t, m), State: read.State}, &updated)
+			r.Update(t.Context(), resource.UpdateRequest{Plan: testPlan(t, &workspaceMemberResource{}, m), State: read.State}, &updated)
 			if updated.Diagnostics.HasError() {
 				t.Fatal(updated.Diagnostics)
 			}
@@ -179,7 +166,7 @@ func TestWorkspaceMemberDiscovery(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "get-full-organization"):
 					if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
@@ -244,7 +231,7 @@ func TestWorkspaceMemberInvitationSafety(t *testing.T) {
 			case "accepted gap":
 				i["status"] = "accepted"
 			}
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				var v any
 				switch {
 				case strings.HasSuffix(r.URL.Path, "get-full-organization"):
@@ -256,12 +243,10 @@ func TestWorkspaceMemberInvitationSafety(t *testing.T) {
 				default:
 					t.Error("read must not mutate")
 				}
-				if err := json.NewEncoder(w).Encode(v); err != nil {
-					t.Error(err)
-				}
+				testEncodeResponse(t, w, v)
 			})
 			m := memberTestModel()
-			p := memberTestPlan(t, m)
+			p := testPlan(t, &workspaceMemberResource{}, m)
 			state := tfsdk.State(p)
 			resp := resource.ReadResponse{State: state}
 			(&workspaceMemberResource{client: c}).Read(t.Context(), resource.ReadRequest{State: state}, &resp)
@@ -281,7 +266,7 @@ func TestWorkspaceMemberPaging(t *testing.T) {
 	for _, mode := range []string{"complete", "moving total", "repeat", "duplicate target", "multi role"} {
 		t.Run(mode, func(t *testing.T) {
 			pages := 0
-			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "get-full-organization"):
 					if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
@@ -323,9 +308,7 @@ func TestWorkspaceMemberPaging(t *testing.T) {
 						members = append(members, memberWire(id, email, role))
 					}
 					pages++
-					if err := json.NewEncoder(w).Encode(map[string]any{"members": members, "total": total}); err != nil {
-						t.Error(err)
-					}
+					testEncodeResponse(t, w, map[string]any{"members": members, "total": total})
 				default:
 					t.Error("unexpected request")
 				}
