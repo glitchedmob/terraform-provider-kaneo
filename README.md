@@ -15,6 +15,7 @@ Set `KANEO_USERNAME` to an existing Kaneo account's email address and `KANEO_PAS
 
 ## Resources and data sources
 
+- [User resource](docs/resources/user.md), requires instance admin access and does not add workspace membership
 - [Workspace resource](docs/resources/workspace.md) and [data source](docs/data-sources/workspace.md)
 - [Project resource](docs/resources/project.md) and [data source](docs/data-sources/project.md)
 - [Column resource](docs/resources/column.md) and [data source](docs/data-sources/column.md)
@@ -32,7 +33,7 @@ make test
 make build
 ```
 
-The generated Go client in `internal/client/client.gen.go` is committed to the repository. Run `make generate` after updating `openapi/kaneo.openapi.json`.
+The generated Go client in `internal/client/client.gen.go` is committed to the repository. Run `make generate` after updating `openapi/kaneo.openapi.json` or `openapi/kaneo.overlay.yaml`. The overlay contains local schema additions and compatibility fixes.
 
 ## License
 
