@@ -54,15 +54,7 @@ func (r *taskLabelResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 }
 
 func (r *taskLabelResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected Provider Data Type", fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData))
-		return
-	}
-	r.client = client
+	configureClient(req.ProviderData, &r.client, &resp.Diagnostics)
 }
 
 func taskLabelModelFromAPI(label kaneoclient.Label, sourceID types.String) taskLabelModel {

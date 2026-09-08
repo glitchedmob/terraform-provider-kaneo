@@ -48,15 +48,7 @@ func (r *labelResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 }
 
 func (r *labelResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected Provider Data Type", fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData))
-		return
-	}
-	r.client = client
+	configureClient(req.ProviderData, &r.client, &resp.Diagnostics)
 }
 
 func (r *labelResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

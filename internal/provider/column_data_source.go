@@ -79,15 +79,7 @@ func (d *columnDataSource) ConfigValidators(context.Context) []datasource.Config
 }
 
 func (d *columnDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected Provider Data Type", fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData))
-		return
-	}
-	d.client = client
+	configureClient(req.ProviderData, &d.client, &resp.Diagnostics)
 }
 
 func (d *columnDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

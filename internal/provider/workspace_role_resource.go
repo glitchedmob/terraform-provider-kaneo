@@ -54,15 +54,7 @@ func (r *workspaceRoleResource) Schema(_ context.Context, _ resource.SchemaReque
 		}}
 }
 func (r *workspaceRoleResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*kaneoclient.ClientWithResponses)
-	if !ok {
-		resp.Diagnostics.AddError("Unexpected Provider Data Type", fmt.Sprintf("Expected *client.ClientWithResponses, got %T.", req.ProviderData))
-		return
-	}
-	r.client = client
+	configureClient(req.ProviderData, &r.client, &resp.Diagnostics)
 }
 func (m *workspaceRoleModel) fromAPI(ctx context.Context, role kaneoclient.WorkspaceRole) diag.Diagnostics {
 	if role.Id == "" || role.OrganizationId != m.WorkspaceID.ValueString() || role.Role == "" || role.Role == "owner" || role.Permission == nil {
