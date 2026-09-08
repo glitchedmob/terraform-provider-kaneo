@@ -1568,6 +1568,17 @@ type WorkflowRuleRow struct {
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
+// Workspace defines model for Workspace.
+type Workspace struct {
+	CreatedAt   time.Time                                 `json:"createdAt"`
+	Description nullable.Nullable[string]                 `json:"description,omitempty"`
+	Id          string                                    `json:"id"`
+	Logo        nullable.Nullable[string]                 `json:"logo,omitempty"`
+	Metadata    nullable.Nullable[map[string]interface{}] `json:"metadata,omitempty"`
+	Name        string                                    `json:"name"`
+	Slug        string                                    `json:"slug"`
+}
+
 // WorkspaceMember defines model for WorkspaceMember.
 type WorkspaceMember struct {
 	Email string                    `json:"email"`
@@ -17755,11 +17766,11 @@ type CreateOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *interface{}
+	JSON200 *Workspace
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CreateOrganizationResponse) GetJSON200() *interface{} {
+func (r CreateOrganizationResponse) GetJSON200() *Workspace {
 	return r.JSON200
 }
 
@@ -18339,11 +18350,11 @@ type ListOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *[]interface{}
+	JSON200 *[]Workspace
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListOrganizationResponse) GetJSON200() *[]interface{} {
+func (r ListOrganizationResponse) GetJSON200() *[]Workspace {
 	return r.JSON200
 }
 
@@ -19008,11 +19019,11 @@ type UpdateOrganizationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *interface{}
+	JSON200 *Workspace
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateOrganizationResponse) GetJSON200() *interface{} {
+func (r UpdateOrganizationResponse) GetJSON200() *Workspace {
 	return r.JSON200
 }
 
@@ -27348,7 +27359,7 @@ func ParseCreateOrganizationResponse(rsp *http.Response) (*CreateOrganizationRes
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
+		var dest Workspace
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -27703,7 +27714,7 @@ func ParseListOrganizationResponse(rsp *http.Response) (*ListOrganizationRespons
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []interface{}
+		var dest []Workspace
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28128,7 +28139,7 @@ func ParseUpdateOrganizationResponse(rsp *http.Response) (*UpdateOrganizationRes
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
+		var dest Workspace
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
