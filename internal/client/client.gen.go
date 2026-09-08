@@ -553,23 +553,6 @@ type Activity struct {
 	UserId    nullable.Nullable[string] `json:"userId"`
 }
 
-// AdminUser defines model for AdminUser.
-type AdminUser struct {
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"emailVerified"`
-	Id            string `json:"id"`
-	Name          string `json:"name"`
-	Role          string `json:"role"`
-}
-
-// AdminUserData defines model for AdminUserData.
-type AdminUserData struct {
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"emailVerified"`
-	Name          string `json:"name"`
-	Role          string `json:"role"`
-}
-
 // Board defines model for Board.
 type Board struct {
 	ArchivedTasks []BoardTask               `json:"archivedTasks"`

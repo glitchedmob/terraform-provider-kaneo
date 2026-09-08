@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Kaneo Better Auth admin API
+  version: 1.6.25
+  description: >-
+    Provider-used subset of Better Auth 1.6.25, used by Kaneo 2.23.2.
+    Get and update return bare users, unlike the published auth schema;
+    create wraps the user. Missing users return 404; permission failures return 403.
+paths:
+  /auth/admin/create-user:
+    post:
+      operationId: createAdminUser
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, role, data]
+              properties:
+                email: {type: string}
+                name: {type: string}
+                role: {type: string}
+                data:
+                  type: object
+                  required: [emailVerified]
+                  properties:
+                    emailVerified: {type: boolean}
+      responses:
+        '200':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: {$ref: '#/components/schemas/AdminUser'}
+  /auth/admin/get-user:
+    get:
+      operationId: getAdminUser
+      tags: [admin]
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminUser'}
+  /auth/admin/update-user:
+    post:
+      operationId: updateAdminUser
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, data]
+              properties:
+                userId: {type: string}
+                data: {$ref: '#/components/schemas/AdminUserData'}
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdminUser'}
+  /auth/admin/remove-user:
+    post:
+      operationId: removeAdminUser
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: {type: string}
+      responses:
+        '200':
+          description: User removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: {type: boolean}
+  /auth/admin/set-user-password:
+    post:
+      operationId: setAdminUserPassword
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, newPassword]
+              properties:
+                userId: {type: string}
+                newPassword: {type: string}
+      responses:
+        '200':
+          description: Password set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: boolean}
+components:
+  schemas:
+    AdminUser:
+      type: object
+      required: [id, email, name, role, emailVerified]
+      properties:
+        id: {type: string}
+        email: {type: string}
+        name: {type: string}
+        role: {type: string}
+        emailVerified: {type: boolean}
+    AdminUserData:
+      type: object
+      required: [email, name, role, emailVerified]
+      properties:
+        email: {type: string}
+        name: {type: string}
+        role: {type: string}
+        emailVerified: {type: boolean}

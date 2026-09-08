@@ -95,140 +95,19 @@ actions:
     description: Type each workspace returned by the organization list endpoint.
     update:
       $ref: '#/components/schemas/Workspace'
-  - target: $.components.schemas
-    description: Better Auth 1.6.25 admin user fields used by the provider. Passwords are never returned.
-    update:
-      AdminUser:
-        type: object
-        required: [id, email, name, role, emailVerified]
-        properties:
-          id: {type: string}
-          email: {type: string}
-          name: {type: string}
-          role: {type: string}
-          emailVerified: {type: boolean}
-      AdminUserData:
-        type: object
-        required: [email, name, role, emailVerified]
-        properties:
-          email: {type: string}
-          name: {type: string}
-          role: {type: string}
-          emailVerified: {type: boolean}
   - target: $.paths
-    description: >-
-      Admin endpoints from Better Auth 1.6.25, used by Kaneo 2.23.2.
-      The live auth schema omits required flags and incorrectly wraps get/update
-      responses in user. routes.mjs returns those users directly. Missing users
-      return 404; permission failures return 403. Keep the pinned Kaneo spec intact.
+    description: Include the separately maintained Better Auth admin operations.
     update:
       /auth/admin/create-user:
-        post:
-          operationId: createAdminUser
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  required: [email, name, role, data]
-                  properties:
-                    email: {type: string}
-                    name: {type: string}
-                    role: {type: string}
-                    data:
-                      type: object
-                      required: [emailVerified]
-                      properties:
-                        emailVerified: {type: boolean}
-          responses:
-            '200':
-              description: Created user
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    required: [user]
-                    properties:
-                      user: {$ref: '#/components/schemas/AdminUser'}
+        $ref: './kaneo.admin.openapi.yaml#/paths/~1auth~1admin~1create-user'
       /auth/admin/get-user:
-        get:
-          operationId: getAdminUser
-          parameters:
-            - name: id
-              in: query
-              required: true
-              schema: {type: string}
-          responses:
-            '200':
-              description: User
-              content:
-                application/json:
-                  schema: {$ref: '#/components/schemas/AdminUser'}
+        $ref: './kaneo.admin.openapi.yaml#/paths/~1auth~1admin~1get-user'
       /auth/admin/update-user:
-        post:
-          operationId: updateAdminUser
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  required: [userId, data]
-                  properties:
-                    userId: {type: string}
-                    data: {$ref: '#/components/schemas/AdminUserData'}
-          responses:
-            '200':
-              description: Updated user
-              content:
-                application/json:
-                  schema: {$ref: '#/components/schemas/AdminUser'}
+        $ref: './kaneo.admin.openapi.yaml#/paths/~1auth~1admin~1update-user'
       /auth/admin/remove-user:
-        post:
-          operationId: removeAdminUser
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  required: [userId]
-                  properties:
-                    userId: {type: string}
-          responses:
-            '200':
-              description: User removed
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    required: [success]
-                    properties:
-                      success: {type: boolean}
+        $ref: './kaneo.admin.openapi.yaml#/paths/~1auth~1admin~1remove-user'
       /auth/admin/set-user-password:
-        post:
-          operationId: setAdminUserPassword
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  required: [userId, newPassword]
-                  properties:
-                    userId: {type: string}
-                    newPassword: {type: string}
-          responses:
-            '200':
-              description: Password set
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    required: [status]
-                    properties:
-                      status: {type: boolean}
+        $ref: './kaneo.admin.openapi.yaml#/paths/~1auth~1admin~1set-user-password'
 
   - target: $.components.schemas
     description: Dynamic role wire responses from Better Auth 1.6.25 crud-access-control.mjs. Permissions are objects, not serialized JSON.

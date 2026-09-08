@@ -1,0 +1,9 @@
+package: client
+generate:
+  models: true
+output: internal/client/admin.gen.go
+output-options:
+  nullable-type: true
+  # Keep component models, but leave operation-derived types to the main pass.
+  skip-prune: true
+  exclude-tags: [admin]

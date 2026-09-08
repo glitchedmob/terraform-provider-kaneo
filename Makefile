@@ -5,6 +5,7 @@ build:
 
 generate:
 	go tool oapi-codegen --config openapi/oapi-codegen.yaml openapi/kaneo.openapi.json
+	go tool oapi-codegen --config openapi/oapi-codegen.admin.yaml openapi/kaneo.admin.openapi.yaml
 
 fmt:
 	gofmt -s -w .
