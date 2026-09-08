@@ -36,7 +36,7 @@ make test
 make build
 ```
 
-`make lint` installs the pinned golangci-lint release into `.bin/` and runs it, just as CI does. The first run requires `curl` and access to GitHub; it does not use or replace a global installation.
+`make lint` runs `go tool golangci-lint`, pinned in the root `go.mod`, just as CI does. No separate installer or global installation is needed.
 
 The generated Go client and admin models in `internal/client/` are committed to the repository. Run `make generate` after updating the specifications or overlay in `openapi/`. See [API specifications](openapi/README.md) for the separately maintained admin endpoints and generation steps.
 
