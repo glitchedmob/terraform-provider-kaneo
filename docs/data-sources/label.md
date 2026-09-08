@@ -6,17 +6,17 @@ description: |-
 
 # kaneo_label
 
-Retrieves a workspace-level label by its ID. Missing labels, task-specific copies, and lookup failures produce diagnostics.
+Retrieves a workspace label by ID. Missing labels, task-copy IDs, and failed lookups are errors.
 
 ## Example usage
 
 ```terraform
 data "kaneo_label" "bug" {
-  id = "workspace-label-id"
+  id = "existing-workspace-label-id"
 }
 ```
 
-Use `data.kaneo_label.bug.id` as the `label_id` of a `kaneo_task_label` resource to attach an existing workspace label without managing the workspace label itself.
+Pass `data.kaneo_label.bug.id` to [`kaneo_task_label.label_id`](/providers/glitchedmob/kaneo/latest/docs/resources/task_label) to attach it without managing the source label.
 
 ## Argument reference
 

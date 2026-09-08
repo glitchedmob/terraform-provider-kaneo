@@ -6,20 +6,16 @@ description: |-
 
 # kaneo_workspace_role
 
-Manages a dynamic workspace role, not an instance role or a membership. Instance roles remain the `role` attribute of `kaneo_user`.
+Manages a dynamic workspace role. It neither assigns memberships nor changes `kaneo_user` instance roles.
 
 The caller must belong to the workspace and hold `ac.read` for refresh and import, `ac.create` for creation, `ac.update` for updates, and `ac.delete` for deletion. Creation and permission updates also require every permission being granted. An instance admin has no bypass. Avoid managing a role that supplies the operator's own permissions, since an update can lock Terraform out.
 
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
+# Replace with an existing workspace ID.
 resource "kaneo_workspace_role" "triage" {
-  workspace_id = kaneo_workspace.engineering.id
+  workspace_id = "existing-workspace-id"
   name         = "triage"
   permissions = {
     project = ["read"]
@@ -29,7 +25,7 @@ resource "kaneo_workspace_role" "triage" {
 }
 ```
 
-Use `kaneo_workspace_role.triage.name` when assigning a workspace role, not its ID. This resource does not assign memberships. Better Auth renames the role row without rewriting existing memberships; update those assignments to the new name too.
+Assign memberships with `kaneo_workspace_role.triage.name`, not `.id`, to establish dependencies. Renaming does not rewrite existing memberships; update their role names too.
 
 ## Argument reference
 
@@ -53,8 +49,8 @@ The authenticated `/api/auth/organization/list-roles?organizationId=workspace-id
 
 Kaneo 2.23.2 seeds `admin`, `member`, and `viewer` as dynamic database roles. Import those existing rows rather than trying to create duplicates. Their permissions can be managed, but deleting an assigned role is rejected. Kaneo may recreate missing seeded roles at startup. The static `owner` role has no dynamic row and cannot be created, imported, or deleted with this resource. Kaneo limits each workspace to 25 dynamic roles, including seeded roles.
 
-## Failure handling
+## Limitations and recovery
 
-Explicit `ROLE_NOT_FOUND` removes the role from state. If role lookup is forbidden, the provider checks `get-full-organization`: only an explicit `ORGANIZATION_NOT_FOUND` proves that the workspace was deleted. Lost membership or lost `ac.read` remains an error, not disappearance. Authentication errors, generic 404s, malformed responses, and server failures also retain state and report errors.
+Only explicit `ROLE_NOT_FOUND` or confirmed `ORGANIZATION_NOT_FOUND` removes state. Lost membership, lost `ac.read`, generic 404s, authentication failures, and other lookup errors retain state; restore access before retrying.
 
-Deletion reads the role first and therefore requires `ac.read` as well as `ac.delete`. Kaneo rejects deletion while the role is assigned to members. Remove those assignments before destroying the role.
+Deletion requires both `ac.read` and `ac.delete`. Remove member assignments first; Kaneo rejects deleting assigned roles.

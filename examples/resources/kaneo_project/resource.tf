@@ -1,10 +1,6 @@
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
+# Replace with an existing workspace ID.
 resource "kaneo_project" "platform" {
-  workspace_id = kaneo_workspace.engineering.id
+  workspace_id = "existing-workspace-id"
   name         = "Platform"
   slug         = "PLAT"
   icon         = "Code"

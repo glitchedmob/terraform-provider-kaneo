@@ -6,56 +6,33 @@ description: |-
 
 # kaneo_task_label
 
-Attaches a workspace-level label to a task. Kaneo creates a separate task-label copy with its own ID. Terraform tracks that returned ID rather than treating the source label as the attachment.
-
-Destroying this resource detaches only the tracked copy. It does not delete the workspace label or task, and does not replace the task's collection of labels.
+Attaches a workspace label as a task-specific copy with its own ID. Destroy detaches only that copy, not the workspace label, task, or other attachments.
 
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
-resource "kaneo_project" "platform" {
-  workspace_id = kaneo_workspace.engineering.id
-  name         = "Platform"
-  slug         = "PLAT"
-}
-
-resource "kaneo_task" "fix" {
-  project_id = kaneo_project.platform.id
-  title      = "Fix deployment failure"
-}
-
-resource "kaneo_label" "bug" {
-  workspace_id = kaneo_workspace.engineering.id
-  name         = "Bug"
-  color        = "#ef4444"
-}
-
+# Existing workspace label and task must be in the same workspace.
 resource "kaneo_task_label" "bug" {
-  label_id = kaneo_label.bug.id
-  task_id  = kaneo_task.fix.id
+  label_id = "existing-workspace-label-id"
+  task_id  = "existing-task-id"
 }
 ```
 
-References to the source label and task establish their creation and deletion dependencies. A label data source can supply `label_id` when the workspace label is managed elsewhere.
+When Terraform manages the label or task, use `kaneo_label.bug.id` and `kaneo_task.fix.id` instead of literals to establish creation/deletion dependencies and reconnect recreated objects. A label data source can supply an externally managed source ID.
 
 ## Argument reference
 
 - `label_id` (String, Required) Non-empty source workspace-level label ID. Task-specific copies are rejected because Kaneo's attach endpoint can move them away from another task. Changing this replaces the attachment.
 - `task_id` (String, Required) Non-empty task ID in the same workspace as the source label. Changing this replaces the attachment.
 
-Kaneo allows only one label with a given name on a task. If a same-name task copy already exists, the provider reports a collision and asks you to import it instead of silently taking ownership. Manage each task/name pair in only one resource. Preflight checks cannot prevent concurrent creates from racing. Use default destroy-before-create replacement; `create_before_destroy` can collide with an existing copy on the same task.
+Only one same-name label is allowed per task. Import existing copies; creates do not adopt them. Manage each task/name pair once and avoid concurrent creates. Use default destroy-before-create replacement; `create_before_destroy` can collide on the same task.
 
 ## Attribute reference
 
 - `id` (String) ID of the task-specific label copy returned by Kaneo. Different from `label_id`.
 - `workspace_id` (String) Workspace identifier shared by the task and source label.
 
-This resource manages the attachment's presence, not its name or color. Workspace-label updates cascade to same-name task copies through Kaneo. Independently editing a task copy's name or color does not trigger an attachment replacement. Deleting the workspace label also deletes matching task copies, including unmanaged ones. See [`kaneo_label`](label.md) for cascade behavior.
+Name and color are not managed here; independent edits do not replace the attachment. Workspace-label updates and deletion cascade to same-name copies, including unmanaged ones. See [label cascades](/providers/glitchedmob/kaneo/latest/docs/resources/label).
 
 ## Import
 
@@ -65,19 +42,8 @@ Import using `source-label-id/task-label-id`:
 terraform import kaneo_task_label.bug workspace-label-id/task-label-copy-id
 ```
 
-Terraform 1.5 or later also supports declarative import:
+The second ID is the copy ID, not the task ID. Import reads `task_id` and `workspace_id` from it. Supply a workspace-level source in the same workspace and configure the copy's current task. Kaneo stores no source-to-copy link; Terraform cannot prove the original source and uses your `label_id` for future recreation. See the [import guide](/providers/glitchedmob/kaneo/latest/docs/guides/import).
 
-```terraform
-import {
-  to = kaneo_task_label.bug
-  id = "workspace-label-id/task-label-copy-id"
-}
-```
+## Limitations and recovery
 
-The second ID is the task copy's ID, not the task ID. Read obtains `task_id` and `workspace_id` from the copy. The source must be a workspace-level label in the same workspace. Kaneo stores no source-to-copy foreign key, so Terraform cannot infer or prove the original source; the supplied `label_id` selects the source for future recreation. Configure the target resource with that source and the copy's current task.
-
-## Drift and deletion
-
-Terraform recreates externally detached copies. If a managed task or source label is deleted externally and recreated, references in the configuration reconnect the new objects. A copy moved to a different task is left alone rather than detached from that other task.
-
-Missing-copy responses are confirmed against the workspace label list before state is removed. Permission errors and failed workspace lookups retain state and report diagnostics. Deleting the workspace externally can require separate reconciliation if its label list is no longer accessible.
+Terraform recreates externally detached copies but leaves copies moved to another task alone. Failed or unauthorized workspace lookups retain state; reconcile an externally deleted workspace separately if its label list is unreadable.

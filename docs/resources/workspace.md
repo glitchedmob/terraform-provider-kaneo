@@ -6,7 +6,7 @@ description: |-
 
 # kaneo_workspace
 
-Manages a Kaneo workspace.
+Manages a Kaneo workspace. Destroying it deletes the workspace and its contents; review dependent projects and access before applying.
 
 ## Example usage
 
@@ -32,8 +32,8 @@ resource "kaneo_workspace" "engineering" {
 
 ## Import
 
-Import a workspace with its ID:
-
 ```shell
 terraform import kaneo_workspace.engineering workspace-id
 ```
+
+See the [import guide](/providers/glitchedmob/kaneo/latest/docs/guides/import) for matching configuration and declarative imports.

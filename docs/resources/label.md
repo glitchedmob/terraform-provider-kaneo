@@ -6,20 +6,16 @@ description: |-
 
 # kaneo_label
 
-Manages a workspace-level label. Use [`kaneo_task_label`](task_label.md) to attach it to a task.
+Manages a workspace-level label. Use [`kaneo_task_label`](/providers/glitchedmob/kaneo/latest/docs/resources/task_label) to attach it to a task.
 
-Deleting or replacing a workspace label also deletes same-name task-label copies throughout that workspace, including copies not managed by Terraform. Renaming or recoloring the workspace label updates those copies. These are Kaneo API behaviors, not Terraform collection management.
+Deleting or replacing a workspace label also deletes same-name task-label copies throughout that workspace, including copies not managed by Terraform. Renaming or recoloring the workspace label updates those copies.
 
 ## Example usage
 
 ```terraform
-resource "kaneo_workspace" "engineering" {
-  name = "Engineering"
-  slug = "engineering"
-}
-
+# Replace with an existing workspace ID.
 resource "kaneo_label" "bug" {
-  workspace_id = kaneo_workspace.engineering.id
+  workspace_id = "existing-workspace-id"
   name         = "Bug"
   color        = "#ef4444"
 }
@@ -31,9 +27,9 @@ resource "kaneo_label" "bug" {
 - `name` (String, Required) Non-empty label name, unique among workspace-level labels in this workspace.
 - `color` (String, Required) Non-empty color string, for example `#ef4444`. Passed through to Kaneo without normalization.
 
-Kaneo identifies task copies for cascading changes by workspace and the label's previous name, not by a source-label foreign key. A copy with the same name is affected even if it was created separately. A copy renamed independently no longer matches that cascade.
+Cascades match the workspace and previous label name, even for separately created copies. Independently renamed copies no longer match.
 
-The provider checks for existing workspace labels before creating one and reports a collision instead of silently adopting it. Import existing labels. These checks cannot prevent concurrent creates from racing; manage each workspace/name pair in only one Terraform resource and avoid concurrent creation of the same name elsewhere.
+Import existing labels; creates do not adopt collisions. Manage each workspace/name pair once and avoid concurrent same-name creates, which can race.
 
 ## Attribute reference
 
@@ -49,19 +45,10 @@ Import by workspace-level label ID:
 terraform import kaneo_label.bug workspace-label-id
 ```
 
-Terraform 1.5 or later also supports declarative import:
+Match `workspace_id`, `name`, and `color` before applying. Task-copy IDs are rejected; import those with `kaneo_task_label`. See the [import guide](/providers/glitchedmob/kaneo/latest/docs/guides/import) for declarative imports and dependency guidance.
 
-```terraform
-import {
-  to = kaneo_label.bug
-  id = "workspace-label-id"
-}
-```
+## Limitations and recovery
 
-Configure `workspace_id`, `name`, and `color` to match the existing label before applying. Task-specific labels are rejected; use the task-label resource to import those copies.
-
-## Drift and deletion
-
-Terraform restores configured names and colors changed outside Terraform and recreates deleted labels. Because Kaneo can report a missing label as HTTP 400, the provider confirms absence against a successful workspace label list. Access errors, malformed responses, or a failed workspace lookup produce diagnostics instead of removing state. An externally deleted workspace requires separate reconciliation if its label list can no longer be read.
+Terraform restores configured values and recreates deleted labels. Failed or unauthorized lookups retain state; reconcile an externally deleted workspace separately if its label list is unreadable.
 
 To remove a label from just one task, destroy its `kaneo_task_label` resource, not this workspace-label resource.

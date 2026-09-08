@@ -1,3 +1,3 @@
 data "kaneo_label" "bug" {
-  id = "workspace-label-id"
+  id = "existing-workspace-label-id"
 }

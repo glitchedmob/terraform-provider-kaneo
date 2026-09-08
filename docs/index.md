@@ -4,11 +4,11 @@ description: |-
   Configure the Kaneo Terraform provider.
 ---
 
-# Kaneo Provider
+# Kaneo provider
 
 The Kaneo provider uses the Kaneo HTTP API. It supports Kaneo Cloud and self-hosted instances.
 
-## Example Usage
+## Example usage
 
 ```terraform
 terraform {
@@ -31,11 +31,13 @@ export KANEO_USERNAME="terraform@example.com"
 export KANEO_PASSWORD="your-password"
 ```
 
-`username` is the Kaneo account's email address. Both credentials are required, either through provider attributes or the environment. Explicit attributes override their corresponding environment variables.
+Both credentials are required; explicit attributes override their environment variables. The provider signs in with email/password and uses a session token, not API keys.
 
-The provider signs in with email/password when configured and uses the returned session token for API requests. It does not create or use API keys. The account must already exist, have a password, and have permission to manage the requested resources. SSO-only accounts and interactive MFA are not supported.
+## Authentication limits
 
-On Kaneo releases where `DISABLE_LOGIN_FORM=true` also blocks backend password sign-in, including 2.23.2, password sign-in must be enabled. Use HTTPS outside local development. A new provider configuration signs in again; expired or revoked sessions are not automatically renewed during a run.
+Use an existing password-enabled account with permission for the requested resources. SSO-only accounts and interactive MFA are unsupported. Enable password sign-in if `DISABLE_LOGIN_FORM=true` blocks it, as in Kaneo 2.23.2. Use HTTPS outside local development.
+
+Expired or revoked sessions are not renewed during a run; a new provider configuration signs in again. Managed-user [password arguments](/providers/glitchedmob/kaneo/latest/docs/guides/passwords) do not change provider authentication.
 
 ## Schema
 

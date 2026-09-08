@@ -6,19 +6,19 @@ description: |-
 
 # kaneo_column
 
-Retrieves a project's board column, including automatically created default columns. The project ID is required for both lookup forms because Kaneo only lists columns by project.
+Retrieves a board column, including project defaults. Both lookup forms require the project ID.
 
 ## Example usage
 
 ```terraform
 data "kaneo_column" "by_id" {
-  project_id = "project-id"
-  id         = "column-id"
+  project_id = "existing-project-id"
+  id         = "existing-column-id"
 }
 
 # Kaneo creates this column automatically for every new project.
 data "kaneo_column" "done" {
-  project_id = "project-id"
+  project_id = "existing-project-id"
   slug       = "done"
 }
 ```
@@ -29,7 +29,7 @@ data "kaneo_column" "done" {
 - `id` (String, Optional) Column identifier. Specify either `id` or `slug`.
 - `slug` (String, Optional) Column slug. Specify either `id` or `slug`.
 
-Lookup arguments must not be empty. Lookup fails if no column matches or the response is ambiguous. Slugs are stable even after a column is renamed. Default slugs are `to-do`, `in-progress`, `in-review`, and `done`.
+Lookup arguments must not be empty. Missing or ambiguous matches fail. Slugs survive renames; defaults are `to-do`, `in-progress`, `in-review`, and `done`.
 
 ## Attribute reference
 

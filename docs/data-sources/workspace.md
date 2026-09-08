@@ -10,21 +10,13 @@ Retrieves an existing Kaneo workspace. Specify exactly one of `id` or `slug`.
 
 ## Example usage
 
-Look up a workspace by slug:
-
 ```terraform
 data "kaneo_workspace" "engineering" {
   slug = "engineering"
 }
 ```
 
-Look up a workspace by ID:
-
-```terraform
-data "kaneo_workspace" "engineering" {
-  id = "workspace-id"
-}
-```
+For ID lookup, replace `slug` with `id = "existing-workspace-id"`.
 
 ## Argument reference
 
