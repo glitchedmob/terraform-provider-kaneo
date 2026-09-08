@@ -12,3 +12,48 @@ actions:
       anyOf:
         - $ref: '#/components/schemas/Notification'
         - type: 'null'
+  - target: $.components.schemas
+    description: Define the workspace returned by Better Auth organization endpoints.
+    update:
+      Workspace:
+        type: object
+        required:
+          - id
+          - name
+          - slug
+          - createdAt
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          slug:
+            type: string
+          logo:
+            type:
+              - string
+              - 'null'
+          metadata:
+            anyOf:
+              - type: object
+                additionalProperties: true
+              - type: 'null'
+          description:
+            type:
+              - string
+              - 'null'
+          createdAt:
+            type: string
+            format: date-time
+  - target: $.paths['/auth/organization/create'].post.responses['200'].content['application/json'].schema
+    description: Type the workspace returned after creation.
+    update:
+      $ref: '#/components/schemas/Workspace'
+  - target: $.paths['/auth/organization/update'].post.responses['200'].content['application/json'].schema
+    description: Type the workspace returned after an update.
+    update:
+      $ref: '#/components/schemas/Workspace'
+  - target: $.paths['/auth/organization/list'].get.responses['200'].content['application/json'].schema.items
+    description: Type each workspace returned by the organization list endpoint.
+    update:
+      $ref: '#/components/schemas/Workspace'

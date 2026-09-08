@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	providerschema "github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
@@ -63,6 +65,32 @@ func TestProviderConfigure(t *testing.T) {
 	}
 	if _, ok := response.ResourceData.(*kaneoclient.ClientWithResponses); !ok {
 		t.Fatalf("expected configured resource client, got %T", response.ResourceData)
+	}
+}
+
+func TestProviderRegistersWorkspaceTypes(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	p := New("test")()
+	resources := p.Resources(ctx)
+	if len(resources) != 1 {
+		t.Fatalf("expected one resource registration, got %d", len(resources))
+	}
+	resourceMetadata := &resource.MetadataResponse{}
+	resources[0]().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "kaneo"}, resourceMetadata)
+	if resourceMetadata.TypeName != "kaneo_workspace" {
+		t.Fatalf("expected workspace resource, got %q", resourceMetadata.TypeName)
+	}
+
+	dataSources := p.DataSources(ctx)
+	if len(dataSources) != 1 {
+		t.Fatalf("expected one data source registration, got %d", len(dataSources))
+	}
+	dataSourceMetadata := &datasource.MetadataResponse{}
+	dataSources[0]().Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "kaneo"}, dataSourceMetadata)
+	if dataSourceMetadata.TypeName != "kaneo_workspace" {
+		t.Fatalf("expected workspace data source, got %q", dataSourceMetadata.TypeName)
 	}
 }
 

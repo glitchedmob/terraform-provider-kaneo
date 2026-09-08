@@ -93,11 +93,15 @@ func (p *KaneoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 }
 
 func (p *KaneoProvider) Resources(context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		newWorkspaceResource,
+	}
 }
 
 func (p *KaneoProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		newWorkspaceDataSource,
+	}
 }
 
 // New returns a provider factory for protocol server registration and tests.
