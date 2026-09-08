@@ -3,12 +3,16 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	kaneoclient "github.com/glitchedmob/terraform-provider-kaneo/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -31,7 +35,8 @@ type KaneoProvider struct {
 // KaneoProviderModel describes the provider configuration.
 type KaneoProviderModel struct {
 	Endpoint types.String `tfsdk:"endpoint"`
-	APIKey   types.String `tfsdk:"api_key"`
+	Username types.String `tfsdk:"username"`
+	Password types.String `tfsdk:"password"`
 }
 
 func (p *KaneoProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -47,8 +52,12 @@ func (p *KaneoProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				MarkdownDescription: "Kaneo API base URL. Defaults to `https://cloud.kaneo.app/api`. May also be set with the `KANEO_API_URL` environment variable.",
 				Optional:            true,
 			},
-			"api_key": schema.StringAttribute{
-				MarkdownDescription: "Kaneo API key. May also be set with the `KANEO_API_KEY` environment variable.",
+			"username": schema.StringAttribute{
+				MarkdownDescription: "Kaneo account email address for password sign-in. May also be set with the `KANEO_USERNAME` environment variable.",
+				Optional:            true,
+			},
+			"password": schema.StringAttribute{
+				MarkdownDescription: "Kaneo account password. May also be set with the `KANEO_PASSWORD` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 			},
@@ -70,19 +79,26 @@ func (p *KaneoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 			"The endpoint must be known while the provider is being configured.",
 		)
 	}
-	if config.APIKey.IsUnknown() {
+	if config.Username.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("api_key"),
-			"Unknown Kaneo API Key",
-			"The API key must be known while the provider is being configured.",
+			path.Root("username"),
+			"Unknown Kaneo Username",
+			"The username must be known while the provider is being configured.",
+		)
+	}
+	if config.Password.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("password"),
+			"Unknown Kaneo Password",
+			"The password must be known while the provider is being configured.",
 		)
 	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	endpoint, apiKey := resolveProviderConfig(config, os.Getenv)
-	client, err := newAPIClient(endpoint, apiKey, p.version)
+	endpoint, username, password := resolveProviderConfig(config, os.Getenv)
+	client, err := newAPIClient(ctx, endpoint, username, password, p.version)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to Configure Kaneo API Client", err.Error())
 		return
@@ -120,7 +136,7 @@ func New(version string) func() provider.Provider {
 	}
 }
 
-func resolveProviderConfig(config KaneoProviderModel, getenv func(string) string) (string, string) {
+func resolveProviderConfig(config KaneoProviderModel, getenv func(string) string) (string, string, string) {
 	endpoint := strings.TrimSpace(getenv("KANEO_API_URL"))
 	if endpoint == "" {
 		endpoint = defaultEndpoint
@@ -129,14 +145,18 @@ func resolveProviderConfig(config KaneoProviderModel, getenv func(string) string
 		endpoint = strings.TrimSpace(config.Endpoint.ValueString())
 	}
 
-	apiKey := getenv("KANEO_API_KEY")
-	if !config.APIKey.IsNull() {
-		apiKey = config.APIKey.ValueString()
+	username := getenv("KANEO_USERNAME")
+	if !config.Username.IsNull() {
+		username = config.Username.ValueString()
 	}
-	return endpoint, apiKey
+	password := getenv("KANEO_PASSWORD")
+	if !config.Password.IsNull() {
+		password = config.Password.ValueString()
+	}
+	return endpoint, strings.TrimSpace(username), password
 }
 
-func newAPIClient(endpoint, apiKey, version string) (*kaneoclient.ClientWithResponses, error) {
+func newAPIClient(ctx context.Context, endpoint, username, password, version string) (*kaneoclient.ClientWithResponses, error) {
 	parsedEndpoint, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("parse endpoint: %w", err)
@@ -151,16 +171,61 @@ func newAPIClient(endpoint, apiKey, version string) (*kaneoclient.ClientWithResp
 		return nil, fmt.Errorf("endpoint must not include a query string or fragment")
 	}
 
-	requestEditor := func(_ context.Context, request *http.Request) error {
-		request.Header.Set("User-Agent", "terraform-provider-kaneo/"+version)
-		if apiKey != "" {
-			request.Header.Set("Authorization", "Bearer "+apiKey)
-		}
-		return nil
+	if parsedEndpoint.User != nil {
+		return nil, fmt.Errorf("endpoint must not include user credentials")
+	}
+	if strings.TrimSpace(username) == "" {
+		return nil, fmt.Errorf("set username or KANEO_USERNAME to the Kaneo account email address")
+	}
+	if password == "" {
+		return nil, fmt.Errorf("set password or KANEO_PASSWORD to the Kaneo account password")
 	}
 
+	endpoint = strings.TrimRight(endpoint, "/")
+	userAgent := "terraform-provider-kaneo/" + version
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		// Do not forward credentials or session tokens through redirects.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	// Kaneo's OpenAPI specification does not include email/password sign-in.
+	body, err := json.Marshal(map[string]string{"email": username, "password": password})
+	if err != nil {
+		return nil, fmt.Errorf("encode sign-in request: %w", err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/auth/sign-in/email", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create sign-in request: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", userAgent)
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("Kaneo sign-in failed: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		// Authentication responses can contain secrets; never include their bodies in diagnostics.
+		return nil, fmt.Errorf("Kaneo email/password sign-in returned HTTP %d", response.StatusCode)
+	}
+	var session struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&session); err != nil {
+		return nil, fmt.Errorf("Kaneo sign-in returned an invalid JSON response")
+	}
+	if strings.TrimSpace(session.Token) == "" {
+		return nil, fmt.Errorf("Kaneo sign-in returned no session token; interactive authentication is not supported")
+	}
+
+	requestEditor := func(_ context.Context, request *http.Request) error {
+		request.Header.Set("User-Agent", userAgent)
+		request.Header.Set("Authorization", "Bearer "+session.Token)
+		return nil
+	}
 	return kaneoclient.NewClientWithResponses(
-		strings.TrimRight(endpoint, "/"),
+		endpoint,
+		kaneoclient.WithHTTPClient(httpClient),
 		kaneoclient.WithRequestEditorFn(requestEditor),
 	)
 }

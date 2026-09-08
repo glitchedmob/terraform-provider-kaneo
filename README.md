@@ -9,6 +9,10 @@ The Kaneo provider manages Kaneo resources through Terraform for both cloud-host
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) 1.0 or later
 - [Go](https://go.dev/doc/install) 1.27.1 or later
 
+## Authentication
+
+Set `KANEO_USERNAME` to an existing Kaneo account's email address and `KANEO_PASSWORD` to its password. The provider signs in and uses the returned Kaneo session, not an API key. See the [provider configuration](docs/index.md) for attributes and sign-in requirements.
+
 ## Resources and data sources
 
 - [Workspace resource](docs/resources/workspace.md) and [data source](docs/data-sources/workspace.md)
