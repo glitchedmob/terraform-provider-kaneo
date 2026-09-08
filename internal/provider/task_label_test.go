@@ -19,11 +19,17 @@ func TestTaskLabelLifecycle(t *testing.T) {
 	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /label/label-1":
-			fmt.Fprint(w, labelFixture)
+			if _, err := fmt.Fprint(w, labelFixture); err != nil {
+				t.Error(err)
+			}
 		case "GET /label/copy-1":
-			fmt.Fprint(w, taskLabelFixture)
+			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+				t.Error(err)
+			}
 		case "GET /label/task/task-1":
-			fmt.Fprint(w, `[`+strings.ReplaceAll(strings.ReplaceAll(taskLabelFixture, "copy-1", "other-1"), "Bug", "Unrelated")+`]`)
+			if _, err := fmt.Fprint(w, `[`+strings.ReplaceAll(strings.ReplaceAll(taskLabelFixture, "copy-1", "other-1"), "Bug", "Unrelated")+`]`); err != nil {
+				t.Error(err)
+			}
 		case "PUT /label/label-1/task":
 			var body map[string]string
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -33,10 +39,14 @@ func TestTaskLabelLifecycle(t *testing.T) {
 				t.Errorf("unexpected attach body: %v", body)
 			}
 			attaches++
-			fmt.Fprint(w, taskLabelFixture)
+			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+				t.Error(err)
+			}
 		case "DELETE /label/copy-1/task":
 			detaches++
-			fmt.Fprint(w, taskLabelFixture)
+			if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+				t.Error(err)
+			}
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -108,7 +118,9 @@ func TestTaskLabelCreateSafety(t *testing.T) {
 					return
 				}
 				if r.URL.Path == "/label/label-1" {
-					fmt.Fprint(w, tc.source)
+					if _, err := fmt.Fprint(w, tc.source); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				if tc.listStatus == 0 {
@@ -117,7 +129,9 @@ func TestTaskLabelCreateSafety(t *testing.T) {
 					return
 				}
 				w.WriteHeader(tc.listStatus)
-				fmt.Fprint(w, tc.list)
+				if _, err := fmt.Fprint(w, tc.list); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &taskLabelResource{client: client}
 			plan := labelTestPlan(t, r, taskLabelModel{LabelID: types.StringValue("label-1"), TaskID: types.StringValue("task-1")})
@@ -145,23 +159,31 @@ func TestTaskLabelMutationErrors(t *testing.T) {
 				if r.Method == http.MethodGet {
 					switch r.URL.Path {
 					case "/label/label-1":
-						fmt.Fprint(w, labelFixture)
+						if _, err := fmt.Fprint(w, labelFixture); err != nil {
+							t.Error(err)
+						}
 					case "/label/copy-1":
-						fmt.Fprint(w, taskLabelFixture)
+						if _, err := fmt.Fprint(w, taskLabelFixture); err != nil {
+							t.Error(err)
+						}
 					case "/label/task/task-1":
-						fmt.Fprint(w, "[]")
+						if _, err := fmt.Fprint(w, "[]"); err != nil {
+							t.Error(err)
+						}
 					default:
 						t.Errorf("unexpected lookup %s", r.URL.Path)
 					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &taskLabelResource{client: client}
 			model := taskLabelModelFromAPI(labelTestAPIValue(t, taskLabelFixture), types.StringValue("label-1"))
 			plan := labelTestPlan(t, r, model)
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 			r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 			if !created.Diagnostics.HasError() {
@@ -216,15 +238,19 @@ func TestTaskLabelReadAndDeleteSafety(t *testing.T) {
 						return
 					}
 					w.WriteHeader(tc.listStatus)
-					fmt.Fprint(w, tc.list)
+					if _, err := fmt.Fprint(w, tc.list); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &taskLabelResource{client: client}
 			plan := labelTestPlan(t, r, taskLabelModelFromAPI(labelTestAPIValue(t, taskLabelFixture), types.StringValue("label-1")))
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
 			if read.Diagnostics.HasError() == tc.absent || read.State.Raw.IsNull() != tc.absent {
@@ -258,14 +284,18 @@ func TestTaskLabelImportInvalidIDs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/label/label-1" {
-					fmt.Fprint(w, tc.source)
+					if _, err := fmt.Fprint(w, tc.source); err != nil {
+						t.Error(err)
+					}
 				} else {
-					fmt.Fprint(w, tc.copy)
+					if _, err := fmt.Fprint(w, tc.copy); err != nil {
+						t.Error(err)
+					}
 				}
 			})
 			r := &taskLabelResource{client: client}
 			plan := labelTestPlan(t, r, taskLabelModel{LabelID: types.StringValue("label-1"), ID: types.StringValue("copy-1")})
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			response := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &response)
 			if !response.Diagnostics.HasError() || !response.State.Raw.Equal(state.Raw) {

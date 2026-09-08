@@ -204,21 +204,22 @@ func newAPIClient(ctx context.Context, endpoint, username, password, version str
 	request.Header.Set("User-Agent", userAgent)
 	response, err := httpClient.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("Kaneo sign-in failed: %w", err)
+		return nil, fmt.Errorf("kaneo sign-in failed: %w", err)
 	}
-	defer response.Body.Close()
+	// Closing a read-only response cannot affect the decoded session or diagnostics.
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		// Authentication responses can contain secrets; never include their bodies in diagnostics.
-		return nil, fmt.Errorf("Kaneo email/password sign-in returned HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("kaneo email/password sign-in returned HTTP %d", response.StatusCode)
 	}
 	var session struct {
 		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&session); err != nil {
-		return nil, fmt.Errorf("Kaneo sign-in returned an invalid JSON response")
+		return nil, fmt.Errorf("kaneo sign-in returned an invalid JSON response")
 	}
 	if strings.TrimSpace(session.Token) == "" {
-		return nil, fmt.Errorf("Kaneo sign-in returned no session token; interactive authentication is not supported")
+		return nil, fmt.Errorf("kaneo sign-in returned no session token; interactive authentication is not supported")
 	}
 
 	requestEditor := func(_ context.Context, request *http.Request) error {

@@ -101,7 +101,9 @@ func handleTestSignIn(t *testing.T, writer http.ResponseWriter, request *http.Re
 		t.Error("incorrect sign-in credentials")
 	}
 	writer.Header().Set("Content-Type", "application/json")
-	fmt.Fprint(writer, `{"token":"test-session"}`)
+	if _, err := fmt.Fprint(writer, `{"token":"test-session"}`); err != nil {
+		t.Error(err)
+	}
 	return true
 }
 
@@ -125,7 +127,9 @@ func TestAPIClientRequestHeaders(t *testing.T) {
 			t.Error("API requests must not send an API key")
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(writer, `{"hasUsers":true,"hasAdmin":true}`)
+		if _, err := fmt.Fprint(writer, `{"hasUsers":true,"hasAdmin":true}`); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer server.Close()
 
@@ -188,7 +192,9 @@ func TestAPIClientSignInFailures(t *testing.T) {
 				}
 				w.Header().Set("Location", "/redirect-target")
 				w.WriteHeader(test.status)
-				fmt.Fprint(w, test.body)
+				if _, err := fmt.Fprint(w, test.body); err != nil {
+					t.Error(err)
+				}
 			}))
 			defer server.Close()
 			client, err := newAPIClient(t.Context(), server.URL, "test@example.com", "secret-password", "test")

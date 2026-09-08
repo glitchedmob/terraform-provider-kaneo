@@ -182,14 +182,20 @@ func TestWorkspaceMemberDiscovery(t *testing.T) {
 			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "get-full-organization"):
-					fmt.Fprint(w, `{"id":"ws"}`)
+					if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
+						t.Error(err)
+					}
 				case strings.HasSuffix(r.URL.Path, "list-members"):
 					if tc.status != 0 {
 						w.WriteHeader(tc.status)
 					}
-					fmt.Fprint(w, tc.members)
+					if _, err := fmt.Fprint(w, tc.members); err != nil {
+						t.Error(err)
+					}
 				case strings.HasSuffix(r.URL.Path, "list-invitations"):
-					fmt.Fprint(w, tc.invitations)
+					if _, err := fmt.Fprint(w, tc.invitations); err != nil {
+						t.Error(err)
+					}
 				default:
 					t.Fatal("refresh mutated remote")
 				}
@@ -250,11 +256,13 @@ func TestWorkspaceMemberInvitationSafety(t *testing.T) {
 				default:
 					t.Error("read must not mutate")
 				}
-				json.NewEncoder(w).Encode(v)
+				if err := json.NewEncoder(w).Encode(v); err != nil {
+					t.Error(err)
+				}
 			})
 			m := memberTestModel()
 			p := memberTestPlan(t, m)
-			state := tfsdk.State{Schema: p.Schema, Raw: p.Raw}
+			state := tfsdk.State(p)
 			resp := resource.ReadResponse{State: state}
 			(&workspaceMemberResource{client: c}).Read(t.Context(), resource.ReadRequest{State: state}, &resp)
 			if resp.Diagnostics.HasError() != wantError {
@@ -276,9 +284,13 @@ func TestWorkspaceMemberPaging(t *testing.T) {
 			c := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "get-full-organization"):
-					fmt.Fprint(w, `{"id":"ws"}`)
+					if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
+						t.Error(err)
+					}
 				case strings.HasSuffix(r.URL.Path, "list-invitations"):
-					fmt.Fprint(w, `[]`)
+					if _, err := fmt.Fprint(w, `[]`); err != nil {
+						t.Error(err)
+					}
 				case strings.HasSuffix(r.URL.Path, "list-members"):
 					q := r.URL.Query()
 					if q.Get("limit") != "100" || q.Get("offset") != fmt.Sprint(pages*100) || q.Get("sortBy") != "id" || q.Get("sortDirection") != "asc" {
@@ -311,7 +323,9 @@ func TestWorkspaceMemberPaging(t *testing.T) {
 						members = append(members, memberWire(id, email, role))
 					}
 					pages++
-					json.NewEncoder(w).Encode(map[string]any{"members": members, "total": total})
+					if err := json.NewEncoder(w).Encode(map[string]any{"members": members, "total": total}); err != nil {
+						t.Error(err)
+					}
 				default:
 					t.Error("unexpected request")
 				}

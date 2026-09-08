@@ -38,7 +38,7 @@ func userTestResource(t *testing.T, handler http.HandlerFunc) (*userResource, tf
 
 func userTestConfig(t *testing.T, plan tfsdk.Plan, password types.String) tfsdk.Config {
 	t.Helper()
-	configured := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+	configured := tfsdk.State(plan)
 	if d := configured.SetAttribute(t.Context(), path.Root("password_wo"), password); d.HasError() {
 		t.Fatal(d)
 	}
@@ -51,7 +51,9 @@ func TestUserReadAndDeleteErrors(t *testing.T) {
 			r, state, _ := userTestResource(t, func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(status)
-				fmt.Fprint(w, `{"message":"secret-password"}`)
+				if _, err := fmt.Fprint(w, `{"message":"secret-password"}`); err != nil {
+					t.Error(err)
+				}
 			})
 			read := &resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, read)
@@ -81,7 +83,9 @@ func TestUserReadPreservesPasswordVersionAndEmailCase(t *testing.T) {
 					t.Errorf("unexpected request %s", req.URL)
 				}
 				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprint(w, `{"id":"user-1","name":"Drift","email":"test@example.com","role":"admin","emailVerified":true}`)
+				if _, err := fmt.Fprint(w, `{"id":"user-1","name":"Drift","email":"test@example.com","role":"admin","emailVerified":true}`); err != nil {
+					t.Error(err)
+				}
 			})
 			if imported {
 				empty := userModel{ID: types.StringNull(), Email: types.StringNull(), Name: types.StringNull(), Role: types.StringNull(), PasswordWO: types.StringNull(), PasswordWOVersion: types.Int64Null(), EmailVerified: types.BoolNull()}
@@ -136,15 +140,21 @@ func TestUserPartialCreateAndUpdate(t *testing.T) {
 					if body["email"] != "test@example.com" {
 						t.Error("email not normalized")
 					}
-					fmt.Fprint(w, `{"user":`+user+`}`)
+					if _, err := fmt.Fprint(w, `{"user":`+user+`}`); err != nil {
+						t.Error(err)
+					}
 				case "/auth/admin/update-user":
-					fmt.Fprint(w, user)
+					if _, err := fmt.Fprint(w, user); err != nil {
+						t.Error(err)
+					}
 				case "/auth/admin/set-user-password":
 					if body["newPassword"] != "secret-password" || body["userId"] != "user-1" {
 						t.Error("wrong password request")
 					}
 					w.WriteHeader(403)
-					fmt.Fprint(w, `{"message":"secret-password"}`)
+					if _, err := fmt.Fprint(w, `{"message":"secret-password"}`); err != nil {
+						t.Error(err)
+					}
 				default:
 					t.Errorf("unexpected endpoint %s", req.URL.Path)
 				}
@@ -191,7 +201,9 @@ func TestUserRejectsMalformedSuccess(t *testing.T) {
 		t.Run(body, func(t *testing.T) {
 			r, state, plan := userTestResource(t, func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprint(w, body)
+				if _, err := fmt.Fprint(w, body); err != nil {
+					t.Error(err)
+				}
 			})
 			read := &resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, read)
@@ -222,9 +234,13 @@ func TestUserOptionalPassword(t *testing.T) {
 				user := `{"id":"user-1","name":"Test","email":"test@example.com","role":"user","emailVerified":false}`
 				switch req.URL.Path {
 				case "/auth/admin/create-user":
-					fmt.Fprint(w, `{"user":`+user+`}`)
+					if _, err := fmt.Fprint(w, `{"user":`+user+`}`); err != nil {
+						t.Error(err)
+					}
 				case "/auth/admin/update-user":
-					fmt.Fprint(w, user)
+					if _, err := fmt.Fprint(w, user); err != nil {
+						t.Error(err)
+					}
 				default:
 					t.Errorf("unexpected password operation: %s", req.URL.Path)
 				}

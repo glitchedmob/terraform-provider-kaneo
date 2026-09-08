@@ -89,7 +89,9 @@ resource "kaneo_user" "test" {
 						if err != nil {
 							return err
 						}
-						response.Body.Close()
+						if err := response.Body.Close(); err != nil {
+							return err
+						}
 						if response.StatusCode != 403 {
 							return fmt.Errorf("non-admin get-user: want 403, got %d", response.StatusCode)
 						}
@@ -107,7 +109,9 @@ resource "kaneo_user" "test" {
 		if err != nil {
 			return err
 		}
-		response.Body.Close()
+		if err := response.Body.Close(); err != nil {
+			return err
+		}
 		if response.StatusCode != 404 {
 			return fmt.Errorf("deleted user: want 404, got %d", response.StatusCode)
 		}
