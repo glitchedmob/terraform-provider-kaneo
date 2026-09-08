@@ -14,6 +14,7 @@ The Kaneo provider manages Kaneo resources through Terraform for both cloud-host
 - [Workspace resource](docs/resources/workspace.md) and [data source](docs/data-sources/workspace.md)
 - [Project resource](docs/resources/project.md) and [data source](docs/data-sources/project.md)
 - [Column resource](docs/resources/column.md) and [data source](docs/data-sources/column.md)
+- [Task resource](docs/resources/task.md) and [data source](docs/data-sources/task.md)
 
 ## Development
 

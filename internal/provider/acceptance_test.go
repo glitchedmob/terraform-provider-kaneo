@@ -28,6 +28,7 @@ var acceptanceProviderFactories = map[string]func() (tfprotov6.ProviderServer, e
 type acceptanceAPI struct {
 	endpoint string
 	key      string
+	userID   string
 	client   *http.Client
 }
 
@@ -42,11 +43,20 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 		t.Fatal(err)
 	}
 	api := &acceptanceAPI{endpoint: endpoint, client: &http.Client{Jar: jar, Timeout: 30 * time.Second}}
+	var signup struct {
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
 	if err := api.request(http.MethodPost, "/auth/sign-up/email", map[string]string{
 		"name": "Terraform Acceptance", "email": "terraform-" + uuid.NewV4().String() + "@example.com",
 		"password": uuid.NewV4().String(),
-	}, nil); err != nil {
+	}, &signup); err != nil {
 		t.Fatalf("create test user: %s", err)
+	}
+	api.userID = signup.User.ID
+	if api.userID == "" {
+		t.Fatal("signup returned no user ID")
 	}
 	var response struct {
 		Key string `json:"key"`
