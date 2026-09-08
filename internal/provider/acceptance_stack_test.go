@@ -62,7 +62,9 @@ func captureAcceptanceLogs(t *testing.T, stack compose.ComposeStack) {
 			continue
 		}
 		data, err := io.ReadAll(logs)
-		logs.Close()
+		if err := logs.Close(); err != nil {
+			t.Logf("close %s logs: %s", service, err)
+		}
 		if err != nil {
 			t.Logf("read %s logs: %s", service, err)
 		}

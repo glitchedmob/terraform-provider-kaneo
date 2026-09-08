@@ -31,9 +31,12 @@ Set `KANEO_USERNAME` to an existing Kaneo account's email address and `KANEO_PAS
 git clone git@github.com:glitchedmob/terraform-provider-kaneo.git
 cd terraform-provider-kaneo
 make generate
+make lint
 make test
 make build
 ```
+
+`make lint` installs the pinned golangci-lint release into `.bin/` and runs it, just as CI does. The first run requires `curl` and access to GitHub; it does not use or replace a global installation.
 
 The generated Go client and admin models in `internal/client/` are committed to the repository. Run `make generate` after updating the specifications or overlay in `openapi/`. See [API specifications](openapi/README.md) for the separately maintained admin endpoints and generation steps.
 

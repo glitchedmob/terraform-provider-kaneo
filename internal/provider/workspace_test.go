@@ -79,13 +79,19 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 			Logo:        body.Logo,
 			CreatedAt:   "2026-01-02T03:04:05Z",
 		}
-		json.NewEncoder(writer).Encode(s.workspace)
+		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
+			s.t.Error(err)
+		}
 	case request.Method == http.MethodGet && request.URL.Path == "/api/auth/organization/list":
 		if s.workspace == nil {
-			json.NewEncoder(writer).Encode([]workspaceAPIValue{})
+			if err := json.NewEncoder(writer).Encode([]workspaceAPIValue{}); err != nil {
+				s.t.Error(err)
+			}
 			return
 		}
-		json.NewEncoder(writer).Encode([]workspaceAPIValue{*s.workspace})
+		if err := json.NewEncoder(writer).Encode([]workspaceAPIValue{*s.workspace}); err != nil {
+			s.t.Error(err)
+		}
 	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/update":
 		var body struct {
 			OrganizationID string `json:"organizationId"`
@@ -113,7 +119,9 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 		}
 		s.workspace.Description = body.Data.Description
 		s.workspace.Logo = body.Data.Logo
-		json.NewEncoder(writer).Encode(s.workspace)
+		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
+			s.t.Error(err)
+		}
 	case request.Method == http.MethodPost && request.URL.Path == "/api/auth/organization/delete":
 		var body struct {
 			OrganizationID string `json:"organizationId"`
@@ -127,7 +135,9 @@ func (s *workspaceAPIServer) handle(writer http.ResponseWriter, request *http.Re
 			http.Error(writer, "workspace not found", http.StatusBadRequest)
 			return
 		}
-		json.NewEncoder(writer).Encode(s.workspace)
+		if err := json.NewEncoder(writer).Encode(s.workspace); err != nil {
+			s.t.Error(err)
+		}
 		s.workspace = nil
 	default:
 		http.NotFound(writer, request)

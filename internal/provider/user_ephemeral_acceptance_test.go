@@ -44,8 +44,11 @@ func TestAccUserEphemeralRandomPassword(t *testing.T) {
 	observer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/auth/admin/set-user-password") {
 			body, err := io.ReadAll(req.Body)
-			req.Body.Close()
+			if err := req.Body.Close(); err != nil {
+				t.Error("close password request body failed")
+			}
 			if err != nil {
+				t.Error("read password request failed")
 				http.Error(w, "read request failed", http.StatusBadRequest)
 				return
 			}
@@ -53,6 +56,7 @@ func TestAccUserEphemeralRandomPassword(t *testing.T) {
 				NewPassword string `json:"newPassword"`
 			}
 			if err := json.Unmarshal(body, &payload); err != nil {
+				t.Error("invalid password request")
 				http.Error(w, "invalid request", http.StatusBadRequest)
 				return
 			}

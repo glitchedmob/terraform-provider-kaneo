@@ -106,7 +106,9 @@ func TestProjectResourceLifecycle(t *testing.T) {
 				remote[field] = value
 			}
 		}
-		json.NewEncoder(w).Encode(remote)
+		if err := json.NewEncoder(w).Encode(remote); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &projectResource{client: client}
 	model := projectTestModel()
@@ -177,11 +179,15 @@ func TestProjectResourceLifecycle(t *testing.T) {
 func TestProjectCreatePartialFailure(t *testing.T) {
 	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			fmt.Fprint(w, projectFixture)
+			if _, err := fmt.Fprint(w, projectFixture); err != nil {
+				t.Error(err)
+			}
 			return
 		}
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, `{"message":"Forbidden"}`)
+		if _, err := fmt.Fprint(w, `{"message":"Forbidden"}`); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &projectResource{client: client}
 	model := projectTestModel()
@@ -227,17 +233,21 @@ func TestProjectMissingAndErrors(t *testing.T) {
 						t.Errorf("unexpected list query: %s", r.URL.RawQuery)
 					}
 					w.WriteHeader(tc.listStatus)
-					fmt.Fprint(w, tc.list)
+					if _, err := fmt.Fprint(w, tc.list); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, `{"message":"Workspace ID could not be determined"}`)
+				if _, err := fmt.Fprint(w, `{"message":"Workspace ID could not be determined"}`); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &projectResource{client: client}
 			model := projectTestModel()
 			model.ID = types.StringValue("project-1")
 			plan := projectTestPlan(t, r, model)
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
 			if read.Diagnostics.HasError() == tc.absent {
@@ -267,13 +277,17 @@ func TestProjectDataSourceLookups(t *testing.T) {
 					if r.URL.Query().Get("workspaceId") != "workspace-1" || r.URL.Query().Get("includeArchived") != "true" {
 						t.Errorf("unexpected list query: %s", r.URL.RawQuery)
 					}
-					fmt.Fprintf(w, "[%s]", archived)
+					if _, err := fmt.Fprintf(w, "[%s]", archived); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				if r.URL.Path != "/project/project-1" {
 					t.Errorf("unexpected path: %s", r.URL.Path)
 				}
-				fmt.Fprint(w, archived)
+				if _, err := fmt.Fprint(w, archived); err != nil {
+					t.Error(err)
+				}
 			})
 			d := &projectDataSource{client: client}
 			model := projectModel{}
@@ -316,7 +330,12 @@ func TestProjectDataSourceErrors(t *testing.T) {
 		{"invalidProject", `{}`, 200, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(tc.status); fmt.Fprint(w, tc.body) })
+			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.status)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
+			})
 			d := &projectDataSource{client: client}
 			model := projectModel{WorkspaceID: types.StringValue("workspace-1"), Slug: types.StringValue("ENG")}
 			if tc.byID {

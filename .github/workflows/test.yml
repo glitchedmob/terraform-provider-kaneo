@@ -24,6 +24,7 @@ jobs:
           terraform_wrapper: false
       - run: go mod download
       - run: make fmt-check
-      - run: make lint
+      - name: Run pinned golangci-lint
+        run: make lint
       - run: make test
       - run: make build

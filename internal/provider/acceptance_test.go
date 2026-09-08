@@ -66,7 +66,7 @@ func newAcceptanceAPI(t *testing.T) *acceptanceAPI {
 	return api
 }
 
-func (a *acceptanceAPI) request(method, path string, body, result any) error {
+func (a *acceptanceAPI) request(method, path string, body, result any) (err error) {
 	var data []byte
 	if body != nil {
 		var err error
@@ -85,7 +85,11 @@ func (a *acceptanceAPI) request(method, path string, body, result any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		// Do not print response bodies: authentication responses can contain secrets.
 		return fmt.Errorf("%s %s returned HTTP %d", method, path, resp.StatusCode)

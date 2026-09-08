@@ -71,11 +71,17 @@ func TestWorkspaceRoleLifecycle(t *testing.T) {
 		role := fmt.Sprintf(`{"id":"role-id","organizationId":"ws","role":%q,"permission":{"project":[],"task":["update","read"]}}`, name)
 		switch {
 		case strings.HasSuffix(req.URL.Path, "get-role"):
-			fmt.Fprint(w, role)
+			if _, err := fmt.Fprint(w, role); err != nil {
+				t.Error(err)
+			}
 		case strings.HasSuffix(req.URL.Path, "delete-role"):
-			fmt.Fprint(w, `{"success":true}`)
+			if _, err := fmt.Fprint(w, `{"success":true}`); err != nil {
+				t.Error(err)
+			}
 		default:
-			fmt.Fprintf(w, `{"success":true,"roleData":%s}`, role)
+			if _, err := fmt.Fprintf(w, `{"success":true,"roleData":%s}`, role); err != nil {
+				t.Error(err)
+			}
 		}
 	})
 	r := &workspaceRoleResource{client: client}
@@ -154,18 +160,22 @@ func TestWorkspaceRoleAbsenceAndErrors(t *testing.T) {
 						t.Error("missing workspace query")
 					}
 					w.WriteHeader(tc.presenceStatus)
-					fmt.Fprint(w, tc.presence)
+					if _, err := fmt.Fprint(w, tc.presence); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				if r.Method != "GET" {
 					t.Error("must not delete after failed read")
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &workspaceRoleResource{client: client}
 			plan := roleTestPlan(t, roleTestModel(t))
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
 			if read.Diagnostics.HasError() != tc.wantError || read.State.Raw.IsNull() != tc.missing {
@@ -225,18 +235,24 @@ func TestWorkspaceRoleMutationErrors(t *testing.T) {
 				client := projectTestClient(t, func(w http.ResponseWriter, req *http.Request) {
 					if req.Method == "GET" {
 						if strings.HasSuffix(req.URL.Path, "get-full-organization") {
-							fmt.Fprint(w, `{"id":"ws"}`)
+							if _, err := fmt.Fprint(w, `{"id":"ws"}`); err != nil {
+								t.Error(err)
+							}
 						} else {
-							fmt.Fprint(w, `{"id":"role-id","organizationId":"ws","role":"custom","permission":{}}`)
+							if _, err := fmt.Fprint(w, `{"id":"role-id","organizationId":"ws","role":"custom","permission":{}}`); err != nil {
+								t.Error(err)
+							}
 						}
 						return
 					}
 					w.WriteHeader(tc.status)
-					fmt.Fprint(w, tc.body)
+					if _, err := fmt.Fprint(w, tc.body); err != nil {
+						t.Error(err)
+					}
 				})
 				r := &workspaceRoleResource{client: client}
 				plan := roleTestPlan(t, roleTestModel(t))
-				state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+				state := tfsdk.State(plan)
 				switch operation {
 				case "create":
 					resp := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}

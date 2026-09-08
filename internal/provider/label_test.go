@@ -56,7 +56,9 @@ func TestLabelLifecycle(t *testing.T) {
 	client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /label/workspace/workspace-1":
-			fmt.Fprint(w, "[]")
+			if _, err := fmt.Fprint(w, "[]"); err != nil {
+				t.Error(err)
+			}
 			return
 		case "POST /label", "PUT /label/label-1":
 			var body map[string]any
@@ -78,7 +80,9 @@ func TestLabelLifecycle(t *testing.T) {
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(remote)
+		if err := json.NewEncoder(w).Encode(remote); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &labelResource{client: client}
 	model := labelModelFromAPI(remote)
@@ -189,15 +193,19 @@ func TestLabelReadAndDeleteErrors(t *testing.T) {
 						return
 					}
 					w.WriteHeader(tc.listStatus)
-					fmt.Fprint(w, tc.list)
+					if _, err := fmt.Fprint(w, tc.list); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &labelResource{client: client}
 			plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
 			if read.Diagnostics.HasError() == tc.absent || read.State.Raw.IsNull() != tc.absent {
@@ -237,18 +245,24 @@ func TestLabelMutationErrors(t *testing.T) {
 			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {
 					if strings.Contains(r.URL.Path, "/workspace/") {
-						fmt.Fprint(w, "[]")
+						if _, err := fmt.Fprint(w, "[]"); err != nil {
+							t.Error(err)
+						}
 					} else {
-						fmt.Fprint(w, labelFixture)
+						if _, err := fmt.Fprint(w, labelFixture); err != nil {
+							t.Error(err)
+						}
 					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &labelResource{client: client}
 			plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			created := resource.CreateResponse{State: tfsdk.State{Schema: plan.Schema}}
 			r.Create(t.Context(), resource.CreateRequest{Plan: plan}, &created)
 			if !created.Diagnostics.HasError() {
@@ -277,7 +291,9 @@ func TestLabelCollision(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		fmt.Fprint(w, `[`+labelFixture+`]`)
+		if _, err := fmt.Fprint(w, `[`+labelFixture+`]`); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &labelResource{client: client}
 	plan := labelTestPlan(t, r, labelModelFromAPI(labelTestAPIValue(t, labelFixture)))

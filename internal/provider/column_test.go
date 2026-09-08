@@ -114,16 +114,22 @@ func TestColumnResourceLifecycle(t *testing.T) {
 				return
 			}
 			remote["position"] = body.Columns[0].Position
-			json.NewEncoder(w).Encode([]any{remote})
+			if err := json.NewEncoder(w).Encode([]any{remote}); err != nil {
+				t.Error(err)
+			}
 			return
 		case "GET /column/project-1":
-			json.NewEncoder(w).Encode([]any{remote})
+			if err := json.NewEncoder(w).Encode([]any{remote}); err != nil {
+				t.Error(err)
+			}
 			return
 		case "DELETE /column/column-1":
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(remote)
+		if err := json.NewEncoder(w).Encode(remote); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &columnResource{client: client}
 	model := columnTestModel()
@@ -211,10 +217,14 @@ func TestColumnPartialReorderFailure(t *testing.T) {
 			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(r.URL.Path, "/reorder/") {
 					w.WriteHeader(403)
-					fmt.Fprint(w, `{"message":"Forbidden"}`)
+					if _, err := fmt.Fprint(w, `{"message":"Forbidden"}`); err != nil {
+						t.Error(err)
+					}
 					return
 				}
-				fmt.Fprint(w, columnFixture)
+				if _, err := fmt.Fprint(w, columnFixture); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &columnResource{client: client}
 			model := columnTestModel()
@@ -271,17 +281,21 @@ func TestColumnReadAndDeleteErrors(t *testing.T) {
 			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {
 					w.WriteHeader(tc.getStatus)
-					fmt.Fprint(w, tc.body)
+					if _, err := fmt.Fprint(w, tc.body); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				w.WriteHeader(tc.deleteStatus)
-				fmt.Fprint(w, `{"message":"Cannot delete column"}`)
+				if _, err := fmt.Fprint(w, `{"message":"Cannot delete column"}`); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &columnResource{client: client}
 			model := columnTestModel()
 			model.ID = types.StringValue("column-1")
 			plan := columnTestPlan(t, r, model)
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			read := resource.ReadResponse{State: state}
 			r.Read(t.Context(), resource.ReadRequest{State: state}, &read)
 			if read.Diagnostics.HasError() != tc.readError || read.State.Raw.IsNull() != tc.absent {
@@ -303,7 +317,9 @@ func TestColumnDataSourceLookups(t *testing.T) {
 				if r.Method != http.MethodGet || r.URL.Path != "/column/project-1" {
 					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 				}
-				fmt.Fprintf(w, "[%s]", columnFixture)
+				if _, err := fmt.Fprintf(w, "[%s]", columnFixture); err != nil {
+					t.Error(err)
+				}
 			})
 			d := &columnDataSource{client: client}
 			model := columnModel{ProjectID: types.StringValue("project-1")}
@@ -332,7 +348,11 @@ func TestColumnDataSourceLookups(t *testing.T) {
 func TestColumnDataSourceErrors(t *testing.T) {
 	for _, body := range []string{`[]`, `null`, `{}`, `{`, `[{}]`, `[` + columnFixture + `,` + strings.Replace(columnFixture, "column-1", "column-2", 1) + `]`} {
 		t.Run(body, func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, body) })
+			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if _, err := fmt.Fprint(w, body); err != nil {
+					t.Error(err)
+				}
+			})
 			d := &columnDataSource{client: client}
 			config := columnTestConfig(t, d, columnModel{ProjectID: types.StringValue("project-1"), Slug: types.StringValue("testing")})
 			response := datasource.ReadResponse{State: tfsdk.State{Schema: config.Schema}}

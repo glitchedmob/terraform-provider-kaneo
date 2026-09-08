@@ -46,7 +46,7 @@ func TestUserWriteOnlySchemaAndValidation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Use framework values to preserve null and unknown exactly.
-			state := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			state := tfsdk.State(plan)
 			if d := state.SetAttribute(t.Context(), path.Root("password_wo_version"), tc.version); d.HasError() {
 				t.Fatal(d)
 			}
@@ -105,7 +105,7 @@ func TestUserPasswordApplyRejectsInvalidConfig(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r, state, plan := userTestResource(t, func(http.ResponseWriter, *http.Request) { t.Error("invalid config reached API") })
-			configured := tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+			configured := tfsdk.State(plan)
 			if d := configured.SetAttribute(t.Context(), path.Root("password_wo_version"), tc.version); d.HasError() {
 				t.Fatal(d)
 			}

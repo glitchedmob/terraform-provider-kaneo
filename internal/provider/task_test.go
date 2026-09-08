@@ -41,7 +41,7 @@ func taskTestState(t *testing.T) tfsdk.State {
 		t.Fatal(err)
 	}
 	plan := taskTestPlan(t, taskModelFromAPI(task, taskModel{}))
-	return tfsdk.State{Schema: plan.Schema, Raw: plan.Raw}
+	return tfsdk.State(plan)
 }
 
 func taskTestConfig(t *testing.T, model taskModel) tfsdk.Config {
@@ -104,7 +104,9 @@ func TestTaskResourceLifecycle(t *testing.T) {
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		json.NewEncoder(w).Encode(remote)
+		if err := json.NewEncoder(w).Encode(remote); err != nil {
+			t.Error(err)
+		}
 	})
 	r := &taskResource{client: client}
 	var model taskModel
@@ -247,7 +249,7 @@ func TestTaskValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := taskTestPlan(t, taskModel{StartDate: tc.start, DueDate: tc.due, AssigneeID: tc.assignee})
 			response := resource.ValidateConfigResponse{}
-			(&taskResource{}).ValidateConfig(t.Context(), resource.ValidateConfigRequest{Config: tfsdk.Config{Schema: plan.Schema, Raw: plan.Raw}}, &response)
+			(&taskResource{}).ValidateConfig(t.Context(), resource.ValidateConfigRequest{Config: tfsdk.Config(plan)}, &response)
 			if response.Diagnostics.HasError() == tc.valid {
 				t.Fatalf("valid=%t, diagnostics=%v", tc.valid, response.Diagnostics)
 			}
@@ -284,7 +286,12 @@ func TestTaskMutationErrors(t *testing.T) {
 		{200, `null`}, {200, `{}`}, {200, `{`}, {200, strings.Replace(taskFixture, "project-1", "project-2", 1)},
 	} {
 		t.Run(fmt.Sprintf("%d/%s", tc.status, tc.body), func(t *testing.T) {
-			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(tc.status); fmt.Fprint(w, tc.body) })
+			client := projectTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.status)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
+			})
 			r := &taskResource{client: client}
 			state := taskTestState(t)
 			var model taskModel
@@ -369,11 +376,15 @@ func TestTaskMissingAndReadErrors(t *testing.T) {
 						t.Errorf("absence lookup must be unfiltered and unpaginated: %s", r.URL.RawQuery)
 					}
 					w.WriteHeader(tc.boardStatus)
-					fmt.Fprint(w, tc.board)
+					if _, err := fmt.Fprint(w, tc.board); err != nil {
+						t.Error(err)
+					}
 					return
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				if _, err := fmt.Fprint(w, tc.body); err != nil {
+					t.Error(err)
+				}
 			})
 			r := &taskResource{client: client}
 			state := taskTestState(t)
