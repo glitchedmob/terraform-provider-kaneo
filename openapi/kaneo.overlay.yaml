@@ -4,6 +4,52 @@ info:
   version: 1.0.0
 actions:
   - target: $.components.schemas
+    description: Narrow team membership and authenticated identity contracts. Session credentials are deliberately not modeled.
+    update:
+      OrganizationTeamMember:
+        type: object
+        required: [id, teamId, userId]
+        properties:
+          id: {type: string}
+          teamId: {type: string}
+          userId: {type: string}
+          createdAt: {type: [string, 'null'], format: date-time}
+      TeamMemberSessionIdentity:
+        type: object
+        required: [user]
+        properties:
+          user:
+            type: object
+            required: [id]
+            properties:
+              id: {type: string}
+  - target: $.paths['/auth/get-session'].get.responses['200']
+    update:
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/TeamMemberSessionIdentity'}
+  - target: $.paths['/auth/organization/add-team-member'].post.responses['200'].content['application/json'].schema
+    remove: true
+  - target: $.paths['/auth/organization/add-team-member'].post.responses['200'].content['application/json']
+    update:
+      schema: {$ref: '#/components/schemas/OrganizationTeamMember'}
+  - target: $.paths['/auth/organization/list-team-members'].get.responses['200'].content['application/json'].schema.items
+    remove: true
+  - target: $.paths['/auth/organization/list-team-members'].get
+    description: Explicit team scope only; runtime has no pagination and caps results at 100.
+    update:
+      parameters:
+        - {name: teamId, in: query, required: true, schema: {type: string}}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items: {$ref: '#/components/schemas/OrganizationTeamMember'}
+  - target: $.paths['/auth/organization/add-team-member','/auth/organization/remove-team-member'].post.requestBody.content['application/json'].schema
+    update:
+      required: [organizationId]
+  - target: $.components.schemas
     description: Team fields used by the provider, verified against Better Auth 1.6.25 crud-team.mjs. Seeded teams may omit updatedAt.
     update:
       OrganizationTeam:

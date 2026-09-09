@@ -1191,6 +1191,14 @@ type OrganizationTeam struct {
 	OrganizationId string  `json:"organizationId"`
 }
 
+// OrganizationTeamMember defines model for OrganizationTeamMember.
+type OrganizationTeamMember struct {
+	CreatedAt nullable.Nullable[time.Time] `json:"createdAt,omitempty"`
+	Id        string                       `json:"id"`
+	TeamId    string                       `json:"teamId"`
+	UserId    string                       `json:"userId"`
+}
+
 // PendingInvitation defines model for PendingInvitation.
 type PendingInvitation struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -1487,6 +1495,13 @@ type TaskWithAssignee struct {
 	UserId nullable.Nullable[string] `json:"userId"`
 }
 
+// TeamMemberSessionIdentity defines model for TeamMemberSessionIdentity.
+type TeamMemberSessionIdentity struct {
+	User struct {
+		Id string `json:"id"`
+	} `json:"user"`
+}
+
 // TelegramIntegration defines model for TelegramIntegration.
 type TelegramIntegration struct {
 	BotTokenConfigured bool `json:"botTokenConfigured"`
@@ -1745,7 +1760,7 @@ type AcceptOrganizationInvitationJSONBody struct {
 // AddOrganizationTeamMemberJSONBody defines parameters for AddOrganizationTeamMember.
 type AddOrganizationTeamMemberJSONBody struct {
 	// OrganizationId The organization ID which the team falls under. If not provided, it will default to the user's active organization.
-	OrganizationId *string `json:"organizationId,omitempty"`
+	OrganizationId string `json:"organizationId"`
 
 	// TeamId The team the user should be a member of.
 	TeamId string `json:"teamId"`
@@ -1908,6 +1923,11 @@ type ListWorkspaceRolesParams struct {
 	OrganizationId string `form:"organizationId" json:"organizationId"`
 }
 
+// ListOrganizationTeamMembersParams defines parameters for ListOrganizationTeamMembers.
+type ListOrganizationTeamMembersParams struct {
+	TeamId string `form:"teamId" json:"teamId"`
+}
+
 // ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
 type ListOrganizationTeamsParams struct {
 	OrganizationId string `form:"organizationId" json:"organizationId"`
@@ -1943,7 +1963,7 @@ type RemoveOrganizationTeam200JSONResponseBodyMessage string
 // RemoveOrganizationTeamMemberJSONBody defines parameters for RemoveOrganizationTeamMember.
 type RemoveOrganizationTeamMemberJSONBody struct {
 	// OrganizationId The organization ID which the team falls under. If not provided, it will default to the user's active organization.
-	OrganizationId *string `json:"organizationId,omitempty"`
+	OrganizationId string `json:"organizationId"`
 
 	// TeamId The team the user should be removed from.
 	TeamId string `json:"teamId"`
@@ -3501,7 +3521,7 @@ type ClientInterface interface {
 	// List the members of the given team.
 	//
 	// Corresponds with GET /auth/organization/list-team-members (the `ListOrganizationTeamMembers` operationId).
-	ListOrganizationTeamMembers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListOrganizationTeamMembers(ctx context.Context, params *ListOrganizationTeamMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationTeams List Organization Teams
 	//
@@ -5914,8 +5934,8 @@ func (c *Client) ListWorkspaceRoles(ctx context.Context, params *ListWorkspaceRo
 // List the members of the given team.
 //
 // Corresponds with GET /auth/organization/list-team-members (the `ListOrganizationTeamMembers` operationId).
-func (c *Client) ListOrganizationTeamMembers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationTeamMembersRequest(c.Server)
+func (c *Client) ListOrganizationTeamMembers(ctx context.Context, params *ListOrganizationTeamMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationTeamMembersRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10670,7 +10690,7 @@ func NewListWorkspaceRolesRequest(server string, params *ListWorkspaceRolesParam
 }
 
 // NewListOrganizationTeamMembersRequest constructs an http.Request for the ListOrganizationTeamMembers method
-func NewListOrganizationTeamMembersRequest(server string) (*http.Request, error) {
+func NewListOrganizationTeamMembersRequest(server string, params *ListOrganizationTeamMembersParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10686,6 +10706,29 @@ func NewListOrganizationTeamMembersRequest(server string) (*http.Request, error)
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "teamId", params.TeamId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -16087,7 +16130,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /auth/organization/list-team-members (the `ListOrganizationTeamMembers` operationId).
-	ListOrganizationTeamMembersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationTeamMembersResponse, error)
+	ListOrganizationTeamMembersWithResponse(ctx context.Context, params *ListOrganizationTeamMembersParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamMembersResponse, error)
 
 	// ListOrganizationTeamsWithResponse List Organization Teams
 	//
@@ -18204,6 +18247,13 @@ func (r GetDeviceAuthorizationPageResponse) ContentType() string {
 type GetSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TeamMemberSessionIdentity
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSessionResponse) GetJSON200() *TeamMemberSessionIdentity {
+	return r.JSON200
 }
 
 // GetBody returns the raw response body bytes
@@ -18286,35 +18336,11 @@ type AddOrganizationTeamMemberResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// CreatedAt Timestamp when the team member was created
-		CreatedAt string `json:"createdAt"`
-
-		// Id Unique identifier of the team member
-		Id string `json:"id"`
-
-		// TeamId The team ID of the team the team member is in
-		TeamId string `json:"teamId"`
-
-		// UserId The user ID of the team member
-		UserId string `json:"userId"`
-	}
+	JSON200 *OrganizationTeamMember
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r AddOrganizationTeamMemberResponse) GetJSON200() *struct {
-	// CreatedAt Timestamp when the team member was created
-	CreatedAt string `json:"createdAt"`
-
-	// Id Unique identifier of the team member
-	Id string `json:"id"`
-
-	// TeamId The team ID of the team the team member is in
-	TeamId string `json:"teamId"`
-
-	// UserId The user ID of the team member
-	UserId string `json:"userId"`
-} {
+func (r AddOrganizationTeamMemberResponse) GetJSON200() *OrganizationTeamMember {
 	return r.JSON200
 }
 
@@ -19157,35 +19183,11 @@ type ListOrganizationTeamMembersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *[]struct {
-		// CreatedAt Timestamp when the team member was created
-		CreatedAt string `json:"createdAt"`
-
-		// Id Unique identifier of the team member
-		Id string `json:"id"`
-
-		// TeamId The team ID of the team the team member is in
-		TeamId string `json:"teamId"`
-
-		// UserId The user ID of the team member
-		UserId string `json:"userId"`
-	}
+	JSON200 *[]OrganizationTeamMember
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListOrganizationTeamMembersResponse) GetJSON200() *[]struct {
-	// CreatedAt Timestamp when the team member was created
-	CreatedAt string `json:"createdAt"`
-
-	// Id Unique identifier of the team member
-	Id string `json:"id"`
-
-	// TeamId The team ID of the team the team member is in
-	TeamId string `json:"teamId"`
-
-	// UserId The user ID of the team member
-	UserId string `json:"userId"`
-} {
+func (r ListOrganizationTeamMembersResponse) GetJSON200() *[]OrganizationTeamMember {
 	return r.JSON200
 }
 
@@ -25007,8 +25009,8 @@ func (c *ClientWithResponses) ListWorkspaceRolesWithResponse(ctx context.Context
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /auth/organization/list-team-members (the `ListOrganizationTeamMembers` operationId).
-func (c *ClientWithResponses) ListOrganizationTeamMembersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationTeamMembersResponse, error) {
-	rsp, err := c.ListOrganizationTeamMembers(ctx, reqEditors...)
+func (c *ClientWithResponses) ListOrganizationTeamMembersWithResponse(ctx context.Context, params *ListOrganizationTeamMembersParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamMembersResponse, error) {
+	rsp, err := c.ListOrganizationTeamMembers(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -28048,6 +28050,16 @@ func ParseGetSessionResponse(rsp *http.Response) (*GetSessionResponse, error) {
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamMemberSessionIdentity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -28098,19 +28110,7 @@ func ParseAddOrganizationTeamMemberResponse(rsp *http.Response) (*AddOrganizatio
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// CreatedAt Timestamp when the team member was created
-			CreatedAt string `json:"createdAt"`
-
-			// Id Unique identifier of the team member
-			Id string `json:"id"`
-
-			// TeamId The team ID of the team the team member is in
-			TeamId string `json:"teamId"`
-
-			// UserId The user ID of the team member
-			UserId string `json:"userId"`
-		}
+		var dest OrganizationTeamMember
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28660,19 +28660,7 @@ func ParseListOrganizationTeamMembersResponse(rsp *http.Response) (*ListOrganiza
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []struct {
-			// CreatedAt Timestamp when the team member was created
-			CreatedAt string `json:"createdAt"`
-
-			// Id Unique identifier of the team member
-			Id string `json:"id"`
-
-			// TeamId The team ID of the team the team member is in
-			TeamId string `json:"teamId"`
-
-			// UserId The user ID of the team member
-			UserId string `json:"userId"`
-		}
+		var dest []OrganizationTeamMember
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
