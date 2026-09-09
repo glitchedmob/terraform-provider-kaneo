@@ -1184,6 +1184,13 @@ type OAuthIdToken struct {
 	IdToken nullable.Nullable[string] `json:"idToken"`
 }
 
+// OrganizationTeam defines model for OrganizationTeam.
+type OrganizationTeam struct {
+	Id             string  `json:"id"`
+	Name           *string `json:"name"`
+	OrganizationId string  `json:"organizationId"`
+}
+
 // PendingInvitation defines model for PendingInvitation.
 type PendingInvitation struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -1795,7 +1802,7 @@ type CreateOrganizationTeamJSONBody struct {
 	Name string `json:"name"`
 
 	// OrganizationId The organization ID which the team will be created in. Defaults to the active organization. Eg: "organization-id"
-	OrganizationId *string `json:"organizationId,omitempty"`
+	OrganizationId string `json:"organizationId"`
 }
 
 // DeleteOrganizationJSONBody defines parameters for DeleteOrganization.
@@ -1901,6 +1908,11 @@ type ListWorkspaceRolesParams struct {
 	OrganizationId string `form:"organizationId" json:"organizationId"`
 }
 
+// ListOrganizationTeamsParams defines parameters for ListOrganizationTeams.
+type ListOrganizationTeamsParams struct {
+	OrganizationId string `form:"organizationId" json:"organizationId"`
+}
+
 // RejectOrganizationInvitationJSONBody defines parameters for RejectOrganizationInvitation.
 type RejectOrganizationInvitationJSONBody struct {
 	// InvitationId The ID of the invitation to reject
@@ -1919,7 +1931,7 @@ type RemoveOrganizationMemberJSONBody struct {
 // RemoveOrganizationTeamJSONBody defines parameters for RemoveOrganizationTeam.
 type RemoveOrganizationTeamJSONBody struct {
 	// OrganizationId The organization ID which the team falls under. If not provided, it will default to the user's active organization. Eg: "organization-id"
-	OrganizationId *string `json:"organizationId,omitempty"`
+	OrganizationId string `json:"organizationId"`
 
 	// TeamId The team ID of the team to remove. Eg: "team-id"
 	TeamId string `json:"teamId"`
@@ -2013,11 +2025,8 @@ type UpdateWorkspaceRoleJSONBody struct {
 // UpdateOrganizationTeamJSONBody defines parameters for UpdateOrganizationTeam.
 type UpdateOrganizationTeamJSONBody struct {
 	Data struct {
-		CreatedAt      *string `json:"createdAt,omitempty"`
-		Id             *string `json:"id,omitempty"`
-		Name           *string `json:"name,omitempty"`
-		OrganizationId *string `json:"organizationId,omitempty"`
-		UpdatedAt      *string `json:"updatedAt,omitempty"`
+		Name           string `json:"name"`
+		OrganizationId string `json:"organizationId"`
 	} `json:"data"`
 
 	// TeamId The ID of the team to be updated. Eg: "team-id"
@@ -3499,7 +3508,7 @@ type ClientInterface interface {
 	// List all teams in an organization.
 	//
 	// Corresponds with GET /auth/organization/list-teams (the `ListOrganizationTeams` operationId).
-	ListOrganizationTeams(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListOrganizationTeams(ctx context.Context, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListOrganizationUserInvitations List Organization User Invitations
 	//
@@ -5922,8 +5931,8 @@ func (c *Client) ListOrganizationTeamMembers(ctx context.Context, reqEditors ...
 // List all teams in an organization.
 //
 // Corresponds with GET /auth/organization/list-teams (the `ListOrganizationTeams` operationId).
-func (c *Client) ListOrganizationTeams(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOrganizationTeamsRequest(c.Server)
+func (c *Client) ListOrganizationTeams(ctx context.Context, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOrganizationTeamsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10688,7 +10697,7 @@ func NewListOrganizationTeamMembersRequest(server string) (*http.Request, error)
 }
 
 // NewListOrganizationTeamsRequest constructs an http.Request for the ListOrganizationTeams method
-func NewListOrganizationTeamsRequest(server string) (*http.Request, error) {
+func NewListOrganizationTeamsRequest(server string, params *ListOrganizationTeamsParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10704,6 +10713,29 @@ func NewListOrganizationTeamsRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "organizationId", params.OrganizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -16064,7 +16096,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /auth/organization/list-teams (the `ListOrganizationTeams` operationId).
-	ListOrganizationTeamsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error)
+	ListOrganizationTeamsWithResponse(ctx context.Context, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error)
 
 	// ListOrganizationUserInvitationsWithResponse List Organization User Invitations
 	//
@@ -18476,41 +18508,11 @@ type CreateOrganizationTeamResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// CreatedAt Timestamp when the team was created
-		CreatedAt string `json:"createdAt"`
-
-		// Id Unique identifier of the created team
-		Id string `json:"id"`
-
-		// Name Name of the team
-		Name string `json:"name"`
-
-		// OrganizationId ID of the organization the team belongs to
-		OrganizationId string `json:"organizationId"`
-
-		// UpdatedAt Timestamp when the team was last updated
-		UpdatedAt string `json:"updatedAt"`
-	}
+	JSON200 *OrganizationTeam
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CreateOrganizationTeamResponse) GetJSON200() *struct {
-	// CreatedAt Timestamp when the team was created
-	CreatedAt string `json:"createdAt"`
-
-	// Id Unique identifier of the created team
-	Id string `json:"id"`
-
-	// Name Name of the team
-	Name string `json:"name"`
-
-	// OrganizationId ID of the organization the team belongs to
-	OrganizationId string `json:"organizationId"`
-
-	// UpdatedAt Timestamp when the team was last updated
-	UpdatedAt string `json:"updatedAt"`
-} {
+func (r CreateOrganizationTeamResponse) GetJSON200() *OrganizationTeam {
 	return r.JSON200
 }
 
@@ -19220,41 +19222,11 @@ type ListOrganizationTeamsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *[]struct {
-		// CreatedAt Timestamp when the team was created
-		CreatedAt string `json:"createdAt"`
-
-		// Id Unique identifier of the team
-		Id string `json:"id"`
-
-		// Name Name of the team
-		Name string `json:"name"`
-
-		// OrganizationId ID of the organization the team belongs to
-		OrganizationId string `json:"organizationId"`
-
-		// UpdatedAt Timestamp when the team was last updated
-		UpdatedAt string `json:"updatedAt"`
-	}
+	JSON200 *[]OrganizationTeam
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListOrganizationTeamsResponse) GetJSON200() *[]struct {
-	// CreatedAt Timestamp when the team was created
-	CreatedAt string `json:"createdAt"`
-
-	// Id Unique identifier of the team
-	Id string `json:"id"`
-
-	// Name Name of the team
-	Name string `json:"name"`
-
-	// OrganizationId ID of the organization the team belongs to
-	OrganizationId string `json:"organizationId"`
-
-	// UpdatedAt Timestamp when the team was last updated
-	UpdatedAt string `json:"updatedAt"`
-} {
+func (r ListOrganizationTeamsResponse) GetJSON200() *[]OrganizationTeam {
 	return r.JSON200
 }
 
@@ -19804,41 +19776,11 @@ type UpdateOrganizationTeamResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// CreatedAt Timestamp when the team was created
-		CreatedAt string `json:"createdAt"`
-
-		// Id Unique identifier of the updated team
-		Id string `json:"id"`
-
-		// Name Updated name of the team
-		Name string `json:"name"`
-
-		// OrganizationId ID of the organization the team belongs to
-		OrganizationId string `json:"organizationId"`
-
-		// UpdatedAt Timestamp when the team was last updated
-		UpdatedAt string `json:"updatedAt"`
-	}
+	JSON200 *OrganizationTeam
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateOrganizationTeamResponse) GetJSON200() *struct {
-	// CreatedAt Timestamp when the team was created
-	CreatedAt string `json:"createdAt"`
-
-	// Id Unique identifier of the updated team
-	Id string `json:"id"`
-
-	// Name Updated name of the team
-	Name string `json:"name"`
-
-	// OrganizationId ID of the organization the team belongs to
-	OrganizationId string `json:"organizationId"`
-
-	// UpdatedAt Timestamp when the team was last updated
-	UpdatedAt string `json:"updatedAt"`
-} {
+func (r UpdateOrganizationTeamResponse) GetJSON200() *OrganizationTeam {
 	return r.JSON200
 }
 
@@ -25080,8 +25022,8 @@ func (c *ClientWithResponses) ListOrganizationTeamMembersWithResponse(ctx contex
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /auth/organization/list-teams (the `ListOrganizationTeams` operationId).
-func (c *ClientWithResponses) ListOrganizationTeamsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error) {
-	rsp, err := c.ListOrganizationTeams(ctx, reqEditors...)
+func (c *ClientWithResponses) ListOrganizationTeamsWithResponse(ctx context.Context, params *ListOrganizationTeamsParams, reqEditors ...RequestEditorFn) (*ListOrganizationTeamsResponse, error) {
+	rsp, err := c.ListOrganizationTeams(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -28297,22 +28239,7 @@ func ParseCreateOrganizationTeamResponse(rsp *http.Response) (*CreateOrganizatio
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// CreatedAt Timestamp when the team was created
-			CreatedAt string `json:"createdAt"`
-
-			// Id Unique identifier of the created team
-			Id string `json:"id"`
-
-			// Name Name of the team
-			Name string `json:"name"`
-
-			// OrganizationId ID of the organization the team belongs to
-			OrganizationId string `json:"organizationId"`
-
-			// UpdatedAt Timestamp when the team was last updated
-			UpdatedAt string `json:"updatedAt"`
-		}
+		var dest OrganizationTeam
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28774,22 +28701,7 @@ func ParseListOrganizationTeamsResponse(rsp *http.Response) (*ListOrganizationTe
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []struct {
-			// CreatedAt Timestamp when the team was created
-			CreatedAt string `json:"createdAt"`
-
-			// Id Unique identifier of the team
-			Id string `json:"id"`
-
-			// Name Name of the team
-			Name string `json:"name"`
-
-			// OrganizationId ID of the organization the team belongs to
-			OrganizationId string `json:"organizationId"`
-
-			// UpdatedAt Timestamp when the team was last updated
-			UpdatedAt string `json:"updatedAt"`
-		}
+		var dest []OrganizationTeam
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -29165,22 +29077,7 @@ func ParseUpdateOrganizationTeamResponse(rsp *http.Response) (*UpdateOrganizatio
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// CreatedAt Timestamp when the team was created
-			CreatedAt string `json:"createdAt"`
-
-			// Id Unique identifier of the updated team
-			Id string `json:"id"`
-
-			// Name Updated name of the team
-			Name string `json:"name"`
-
-			// OrganizationId ID of the organization the team belongs to
-			OrganizationId string `json:"organizationId"`
-
-			// UpdatedAt Timestamp when the team was last updated
-			UpdatedAt string `json:"updatedAt"`
-		}
+		var dest OrganizationTeam
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
