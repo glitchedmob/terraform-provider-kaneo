@@ -4,6 +4,8 @@
 - `kaneo.admin.openapi.yaml` contains the admin operations and models used by the provider, verified against Better Auth 1.6.25 in Kaneo 2.23.2. It describes the subset the provider uses, not every optional API field. Get/update responses are bare users, despite the published auth schema showing wrappers.
 - `kaneo.overlay.yaml` corrects the upstream specification and includes the admin paths through external Path Item references. Their relative paths resolve beside `kaneo.openapi.json`.
 
+The team overlay covers only create, list, rename, and remove. Better Auth 1.6.25 takes update scope in `data.organizationId` and returns a bare team for create/update; remove returns `{"message":"Team removed successfully."}`. `OrganizationTeam` describes only the provider's required identity, scope, and name fields. The name pointer distinguishes missing/null from a valid empty string. Timestamps are deliberately not exposed; seeded teams may omit `updatedAt`. Team-member contracts are not part of this overlay.
+
 Run `make generate` from the repository root. It uses the existing `oapi-codegen` tool twice:
 
 1. `oapi-codegen.yaml` generates all client operations and operation-derived types in `internal/client/client.gen.go`.

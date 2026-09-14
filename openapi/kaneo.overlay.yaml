@@ -3,6 +3,48 @@ info:
   title: Kaneo client generation fixes
   version: 1.0.0
 actions:
+  - target: $.components.schemas
+    description: Team fields used by the provider, verified against Better Auth 1.6.25 crud-team.mjs. Seeded teams may omit updatedAt.
+    update:
+      OrganizationTeam:
+        type: object
+        required: [id, organizationId, name]
+        properties:
+          id: {type: string}
+          organizationId: {type: string}
+          name: {type: string, x-go-type: '*string'}
+  - target: $.paths['/auth/organization/create-team','/auth/organization/update-team'].post.responses['200'].content['application/json'].schema
+    remove: true
+  - target: $.paths['/auth/organization/create-team','/auth/organization/update-team'].post.responses['200'].content['application/json']
+    update:
+      schema: {$ref: '#/components/schemas/OrganizationTeam'}
+  - target: $.paths['/auth/organization/list-teams'].get.responses['200'].content['application/json'].schema.items
+    remove: true
+  - target: $.paths['/auth/organization/list-teams'].get
+    description: Always pass explicit workspace scope. The endpoint has no pagination parameters.
+    update:
+      parameters:
+        - {name: organizationId, in: query, required: true, schema: {type: string}}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items: {$ref: '#/components/schemas/OrganizationTeam'}
+  - target: $.paths['/auth/organization/create-team','/auth/organization/remove-team'].post.requestBody.content['application/json'].schema
+    update:
+      required: [organizationId]
+  - target: $.paths['/auth/organization/update-team'].post.requestBody.content['application/json'].schema.properties.data
+    remove: true
+  - target: $.paths['/auth/organization/update-team'].post.requestBody.content['application/json'].schema.properties
+    description: Send only the supported rename and explicit scope, never writable IDs or timestamps.
+    update:
+      data:
+        type: object
+        required: [organizationId, name]
+        properties:
+          organizationId: {type: string}
+          name: {type: string}
   - target: $.components.schemas['Task','BoardTask'].properties.position.type
     description: Replace the nullable floating-point task position type.
     remove: true
